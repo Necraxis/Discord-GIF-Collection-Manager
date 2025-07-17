@@ -39,8 +39,9 @@ async function SaveCurrentCollectionToJson() {
       xQ: Current.xQ || { x: [] }
     }
 
-    Fs.writeFileSync("gif_collection.json", JSON.stringify(CleanCollection, null, 2))
-    console.log(Chalk.green("\n\nSuccessfully saved collection to gif_collection.json"))
+    const FileName = `Sharing/gif_collection_${new Date().toLocaleDateString('en-CA').replace(/\//g, '-')}_${Date.now()}.json`
+    Fs.writeFileSync(FileName, JSON.stringify(CleanCollection, null, 2))      
+    console.log(Chalk.green(`\n\nSuccessfully saved collection to ${FileName}`))
 
     await Prompt({
       type: "input",
@@ -65,10 +66,14 @@ async function SaveCurrentCollectionToBase64() {
       xQ: { x: [] }
     }
 
+    const FileName = `Sharing/gif_backup_${new Date().toLocaleDateString('en-CA').replace(/\//g, '-')}_${Date.now()}.txt`
     const Base64 = Processor.JsonToBase64(CleanCollection)
-    Fs.writeFileSync("gif_collection_base64.txt", Base64)
+    Fs.writeFileSync(
+      FileName,
+      Base64
+    )
 
-    console.log(Chalk.green("\n\nSuccessfully saved collection to gif_collection_base64.txt"))
+    console.log(Chalk.green(`\n\nSuccessfully saved collection to ${FileName}`))
     console.log(Chalk.blue("You can share this base64 string with others"))
 
     await Prompt({
