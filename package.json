@@ -1,0 +1,27 @@
+{
+  "name": "discord-gif-collection-manager",
+  "version": "1.0.0",
+  "description": "A discord gif manager that handles how GIFs this is made so you can transfer, share, combine your gifs really quickly between accounts or people! (I have a 5 year collection i wanted to share)",
+  "keywords": [
+    "discord",
+    "gif",
+    "transfer",
+    "manager"
+  ],
+  "license": "ISC",
+  "author": "@necraxis",
+  "type": "commonjs",
+  "main": "Main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "chalk": "^4.1.2",
+    "copy-paste": "^2.2.0",
+    "fs": "^0.0.1-security",
+    "inquirer": "^12.7.0",
+    "protobufjs": "^7.5.3",
+    "table": "^6.9.0"
+  }
+}
