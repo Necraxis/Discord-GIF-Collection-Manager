@@ -194,7 +194,7 @@ A: This is a Node.js command-line application designed for desktop use. Mobile i
 
 ## 🎥 Tutorial
 
-[![Discord GIF Manager Tutorial](https://img.youtube.com/vi/YOUR_VIDEO_ID/0.jpg)](https://youtu.be/YOUR_VIDEO_ID)
+[![Discord GIF Manager Tutorial](https://img.youtube.com/vi/aQJf9I9Wd6U/0.jpg)](https://youtu.be/aQJf9I9Wd6U)
 
 Complete walkthrough of installation, setup, and all features.
 
