@@ -15,7 +15,7 @@
 
 ### 💾 **Backup & Export**
 - **JSON Export**: Full metadata backup saved as `gif_collection_[date]_[timestamp].json`
-- **Base64 Export**: Lightweight, shareable format saved as `gif_backup_[date]_[timestamp].txt`
+- **Base64 Export**: Lightweight, shareable format saved as `gif_backup_[date]_[timestamp].bin`
 - **Manual Backup**: Save before making changes (user initiated)
 
 ### 🔒 **Security**
@@ -176,7 +176,7 @@ A: No. The tool uses the same API calls that Discord's client uses when you add 
 A: No. This tool doesn't violate Discord's Terms of Service as it only uses official API endpoints normally.
 
 **Q: How do I share my GIF collection?**  
-A: Use "Save Current Collection to Base64", then share the generated `.txt` file. Others can import it using "Replace Collection".
+A: Use "Save Current Collection to Base64", then share the generated `.bin` file. Others can import it using "Replace Collection" or "Combine Collection".
 
 **Q: What happens if I accidentally delete my collection?**  
 A: If you have a backup file, you can restore it using "Replace Collection". Always backup before making changes!

@@ -112,17 +112,7 @@ function JsonToBase64(JsonData) {
   }
 }
 
-function SaveJsonToFile(FilePath, JsonData) {
-  FileSystem.writeFileSync(FilePath, JSON.stringify(JsonData, null, 2))
-}
-
-function LoadJsonFromFile(FilePath) {
-  return JSON.parse(FileSystem.readFileSync(FilePath))
-}
-
 module.exports = {
   Base64ToJson,
-  JsonToBase64,
-  SaveJsonToFile,
-  LoadJsonFromFile
+  JsonToBase64
 }

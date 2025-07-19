@@ -39,9 +39,14 @@ async function SaveCurrentCollectionToJson() {
       xQ: Current.xQ || { x: [] }
     }
 
-    const FileName = `Sharing/gif_collection_${new Date().toLocaleDateString('en-CA').replace(/\//g, '-')}_${Date.now()}.json`
-    Fs.writeFileSync(FileName, JSON.stringify(CleanCollection, null, 2))      
-    console.log(Chalk.green(`\n\nSuccessfully saved collection to ${FileName}`))
+    const FileName = `gif_collection_${new Date().toLocaleDateString('en-CA').replace(/\//g, '-')}_${Date.now()}.json`
+    const Json = JSON.stringify(CleanCollection, null, 2)
+
+    Fs.writeFileSync(FileName, Json)
+    await copy.json(Json)
+
+    console.log(Chalk.green(`\n\nSuccessfully saved collection to ${FileName} and copied its contents to clipboard.`))
+    console.log(Chalk.blue("You can share this json data with others or use it for your own self."))
 
     await Prompt({
       type: "input",
@@ -66,15 +71,13 @@ async function SaveCurrentCollectionToBase64() {
       xQ: { x: [] }
     }
 
-    const FileName = `Sharing/gif_backup_${new Date().toLocaleDateString('en-CA').replace(/\//g, '-')}_${Date.now()}.txt`
+    const FileName = `gif_collection_${new Date().toLocaleDateString('en-CA').replace(/\//g, '-')}_${Date.now()}.bin`
     const Base64 = Processor.JsonToBase64(CleanCollection)
-    Fs.writeFileSync(
-      FileName,
-      Base64
-    )
+    Fs.writeFileSync(FileName, Base64)
+    await copy(Base64)
 
-    console.log(Chalk.green(`\n\nSuccessfully saved collection to ${FileName}`))
-    console.log(Chalk.blue("You can share this base64 string with others"))
+    console.log(Chalk.green(`\n\nSuccessfully saved collection to ${FileName} and copied its contents to clipboard.`))
+    console.log(Chalk.blue("You can share this base64 string with others."))
 
     await Prompt({
       type: "input",
