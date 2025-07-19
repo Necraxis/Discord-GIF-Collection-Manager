@@ -15,7 +15,7 @@
 
 ### 💾 **Backup & Export**
 - **JSON Export**: Full metadata backup saved as `gif_collection_[date]_[timestamp].json`
-- **Base64 Export**: Lightweight, shareable format saved as `gif_backup_[date]_[timestamp].bin`
+- **Base64 Export**: Lightweight, shareable format saved as `gif_collection_[date]_[timestamp].bin`
 - **Manual Backup**: Save before making changes (user initiated)
 
 ### 🔒 **Security**
