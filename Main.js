@@ -1,21 +1,29 @@
-const Handler = require("./Handler.js")
-const Processor = require("./Processor.js")
+const Handler = require("./Handler")
+const Processor = require("./Processor")
 const Chalk = require("chalk")
 const Clipboardy = require("copy-paste")
 const Inquirer = require("inquirer")
 const Table = require("table")
 const Fs = require("fs")
-const Prompt = Inquirer.createPromptModule()
 
+const Prompt = Inquirer.createPromptModule()
 let Token = null
 let CurrentSelections = []
+let IsPromptActive = false
 
 function ClearConsole() {
   console.clear()
 }
 
+async function SafePrompt(Options) {
+  IsPromptActive = true
+  const Result = await Prompt(Options)
+  IsPromptActive = false
+  return Result
+}
+
 async function GetToken() {
-  const Response = await Prompt({
+  const Response = await SafePrompt({
     type: "password",
     name: "token",
     message: "Enter your Discord token:",
@@ -39,16 +47,16 @@ async function SaveCurrentCollectionToJson() {
       xQ: Current.xQ || { x: [] }
     }
 
-    const FileName = `gif_collection_${new Date().toLocaleDateString('en-CA').replace(/\//g, '-')}_${Date.now()}.json`
+    const FileName = `gif_collection_${new Date().toLocaleDateString("en-CA").replace(/\//g, "-")}_${Date.now()}.json`
     const Json = JSON.stringify(CleanCollection, null, 2)
 
     Fs.writeFileSync(FileName, Json)
-    await copy.json(Json)
+    await Clipboardy.copy.json(Json)
 
     console.log(Chalk.green(`\n\nSuccessfully saved collection to ${FileName} and copied its contents to clipboard.`))
     console.log(Chalk.blue("You can share this json data with others or use it for your own self."))
 
-    await Prompt({
+    await SafePrompt({
       type: "input",
       name: "continue",
       message: "Press Enter to continue..."
@@ -71,15 +79,15 @@ async function SaveCurrentCollectionToBase64() {
       xQ: { x: [] }
     }
 
-    const FileName = `gif_collection_${new Date().toLocaleDateString('en-CA').replace(/\//g, '-')}_${Date.now()}.bin`
+    const FileName = `gif_collection_${new Date().toLocaleDateString("en-CA").replace(/\//g, "-")}_${Date.now()}.bin`
     const Base64 = Processor.JsonToBase64(CleanCollection)
     Fs.writeFileSync(FileName, Base64)
-    await copy(Base64)
+    Clipboardy.copy(Base64)
 
     console.log(Chalk.green(`\n\nSuccessfully saved collection to ${FileName} and copied its contents to clipboard.`))
     console.log(Chalk.blue("You can share this base64 string with others."))
 
-    await Prompt({
+    await SafePrompt({
       type: "input",
       name: "continue",
       message: "Press Enter to continue..."
@@ -91,7 +99,7 @@ async function SaveCurrentCollectionToBase64() {
 
 async function HandleClipboardInput() {
   try {
-    const ClipboardContent = await Clipboardy.paste()
+    const ClipboardContent = Clipboardy.paste()
     const TrimmedContent = ClipboardContent.trim()
 
     if (!TrimmedContent) {
@@ -122,7 +130,7 @@ async function HandleClipboardInput() {
 
 function DisplayCollectionTable() {
   if (CurrentSelections.length === 0) {
-    console.log(Chalk.yellow("No collections selected yet."))
+    console.log(Chalk.yellow("No collections selected yet"))
     return
   }
 
@@ -149,7 +157,7 @@ async function CollectionSelectionMenu(Action) {
     ClearConsole()
     DisplayCollectionTable()
 
-    const Response = await Prompt({
+    const Response = await SafePrompt({
       type: "list",
       name: "subAction",
       message: `${Action} Collection - Select Action`,
@@ -166,8 +174,8 @@ async function CollectionSelectionMenu(Action) {
         break
       case "continue":
         if (CurrentSelections.length === 0 && Action === "Replace") {
-          console.log(Chalk.yellow("Warning: No collections selected. This will clear your collection."))
-          const Confirmation = await Prompt({
+          console.log(Chalk.yellow("Warning: No collections selected This will clear your collection"))
+          const Confirmation = await SafePrompt({
             type: "confirm",
             name: "confirm",
             message: "Are you sure you want to continue with no collections?",
@@ -177,10 +185,10 @@ async function CollectionSelectionMenu(Action) {
         }
         return
       case "exit":
-        const Confirmation = await Prompt({
+        const Confirmation = await SafePrompt({
           type: "confirm",
           name: "confirm",
-          message: "Are you sure you want to exit? All selections will be lost.",
+          message: "Are you sure you want to exit? All selections will be lost",
           default: false
         })
         if (Confirmation.confirm) return
@@ -200,7 +208,7 @@ async function CombineCollectionMenu() {
     console.log(Chalk.green(`Added your current collection (${Current.gifs?.favorites?.length || 0} GIFs) to combine list`))
   } catch (Error) {
     console.error(Chalk.red("Failed to get current collection:"), Error)
-    await Prompt({
+    await SafePrompt({
       type: "input",
       name: "continue",
       message: "Press Enter to continue..."
@@ -215,11 +223,11 @@ async function CombineCollectionMenu() {
     try {
       await Handler.CombineCollection(Token, CurrentSelections.slice(1))
       const NewCount = (await Handler.GetCurrentCollection(Token)).gifs.favorites.length
-      console.log(Chalk.green(`Successfully combined collections! You now have ${NewCount} GIFs.`))
+      console.log(Chalk.green(`Successfully combined collections! You now have ${NewCount} GIFs`))
     } catch (Error) {
       console.error(Chalk.red("Failed to combine collections:"), Error)
     }
-    await Prompt({
+    await SafePrompt({
       type: "input",
       name: "continue",
       message: "Press Enter to continue..."
@@ -239,7 +247,7 @@ async function ReplaceCollectionMenu() {
 async function MainMenu() {
   while (true) {
     ClearConsole()
-    const Response = await Prompt({
+    const Response = await SafePrompt({
       type: "list",
       name: "action",
       message: "Main Menu",
@@ -253,6 +261,11 @@ async function MainMenu() {
       ]
     })
 
+    if (IsPromptActive) {
+      console.log(Chalk.yellow("Please finish current prompt first!"))
+      continue
+    }
+
     switch (Response.action) {
       case "clear":
         await Handler.ClearCollection(Token)
@@ -264,10 +277,10 @@ async function MainMenu() {
         await CombineCollectionMenu()
         break
       case "save_json":
-        SaveCurrentCollectionToJson()
+        await SaveCurrentCollectionToJson()
         break
       case "save_base64":
-        SaveCurrentCollectionToBase64()
+        await SaveCurrentCollectionToBase64()
         break
       case "exit":
         console.log(Chalk.blue("Goodbye!"))
@@ -292,16 +305,13 @@ async function Start() {
     await GetToken()
     await MainMenu()
   } catch (Error) {
-    if (Error.name === 'ExitPromptError') {
-      ClearConsole()
-      console.log('\n' + Chalk.blue('Goodbye!'))
-      process.exit(0)
+    if (Error.isTtyError) {
+      console.error(Chalk.red("Prompt couldn't be rendered in current environment"))
     } else {
       console.error(Chalk.red("Fatal error:"), Error)
-      process.exit(1)
     }
+    process.exit(1)
   }
-
 }
 
 Start().catch(Error => {
