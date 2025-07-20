@@ -701,6 +701,41 @@ class GifCurator {
         this.RenderGifGrid()
     }
 
+    GenerateUniqueIdFromData(Data) {
+        try {
+            let DataString
+            if (typeof Data === "object" && Data !== null) {
+                DataString = JSON.stringify(Data)
+            } else if (typeof Data === "string") {
+                try {
+                    const Parsed = JSON.parse(Data)
+                    DataString = JSON.stringify(Parsed)
+                } catch (Error) {
+                    DataString = Data
+                }
+            } else {
+                DataString = String(Data)
+            }
+
+            const HashBuffer = new Uint8Array(32)
+            if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+                crypto.getRandomValues(HashBuffer)
+            } else {
+                for (let i = 0; i < 32; i++) HashBuffer[i] = Math.floor(Math.random() * 256)
+            }
+
+            const HashBase64 = btoa(String.fromCharCode(...HashBuffer))
+                .replace(/\+/g, "-")
+                .replace(/\//g, "_")
+                .replace(/=+$/, "")
+                .substring(0, 30)
+            return HashBase64
+        } catch (Error) {
+            const FallbackId = typeof Data === "string" ? Data.slice(0, 30) : "fallback"
+            return FallbackId.replace(/[+/=]/g, "_")
+        }
+    }
+
     ShowJsonView() {
         const ExportData = this.GetExportData()
         const FormattedJson = this.SyntaxHighlight(JSON.stringify(ExportData, null, 2))
@@ -753,11 +788,12 @@ class GifCurator {
 
     ExportJson() {
         const ExportData = this.GetExportData()
+        const Unique = this.GenerateUniqueIdFromData(ExportData)
         const Data = new Blob([JSON.stringify(ExportData, null, 2)], { type: "application/json" })
         const Url = URL.createObjectURL(Data)
         const A = document.createElement("a")
         A.href = Url
-        A.download = "gif_collection.json"
+        A.download = "gifs_export_" + Unique + ".json"
         A.click()
         URL.revokeObjectURL(Url)
     }
@@ -769,11 +805,13 @@ class GifCurator {
             const Base64String = typeof BinaryData === "string" && BinaryData.includes(",")
                 ? this.ConvertByteStringToBase64(BinaryData)
                 : BinaryData
+
+            const Unique = this.GenerateUniqueIdFromData(Base64String)
             const Data = new Blob([Base64String], { type: "application/octet-stream" })
             const Url = URL.createObjectURL(Data)
             const A = document.createElement("a")
             A.href = Url
-            A.download = "gifs_export.bin"
+            A.download = "gifs_export_" + Unique + ".bin"
             A.click()
             URL.revokeObjectURL(Url)
         } catch (Error) {
@@ -812,7 +850,7 @@ class GifCurator {
     }
 
     ShowStatusMessage(Message, Type = "info", Section = null) {
-        console.log(`[${Type}] ${Message}`);
+        console.log(`[${Type}] ${Message}`)
 
         const BackgroundColors = {
             success: "#4BB543",
