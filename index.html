@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DISCORD GIF COLLECTION MANAGER</title>
+    <link href="./Output.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script src="./Processor.js" defer></script>
+    <script src="./Handler.js" defer></script>
+</head>
+
+<body class="bg-black text-text p-0 m-0 overflow-hidden">
+    <div class="max-w-4xl mx-auto flex flex-col items-center h-screen w-full relative">
+        <!-- Login Section -->
+        <section id="LoginSection" class="hidden w-full h-full flex flex-col p-8 gap-4">
+            <header class="w-full bg-gray-1 rounded-default p-4 text-center">
+                <h1 class="text-3xl font-bold">DISCORD GIF COLLECTION MANAGER</h1>
+            </header>
+
+            <div class="bg-gray-1 rounded-default w-full flex-1 min-h-0 p-8 overflow-y-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                    <div class="bg-gray-2 rounded-default p-6 flex flex-col items-center h-full">
+                        <div class="relative">
+                            <svg class="w-16 h-16 text-gray-4 mb-4 transition-colors" viewBox="0 0 512 512">
+                                <path fill="currentColor"
+                                    d="M336 352c97.2 0 176-78.8 176-176S433.2 0 336 0S160 78.8 160 176c0 18.7 2.9 36.8 8.3 53.7L7 391c-4.5 4.5-7 10.6-7 17v80c0 13.3 10.7 24 24 24h80c13.3 0 24-10.7 24-24V448h40c13.3 0 24-10.7 24-24V384h40c6.4 0 12.5-2.5 17-7l33.3-33.3c16.9 5.4 35 8.3 53.7 8.3zM376 96a40 40 0 1 1 0 80 40 40 0 1 1 0-80z">
+                                </path>
+                            </svg>
+                            <div
+                                class="absolute -inset-2 border-2 border-purple-400 rounded-default opacity-0 transition-opacity pointer-events-none">
+                            </div>
+                        </div>
+                        <h2 class="text-xl font-bold mb-3 text-center">TOKEN LOGIN</h2>
+                        <p class="text-sm text-center text-text-muted mb-4">
+                            Securely access your Discord GIF collection to manage, edit, and organize your favorites
+                        </p>
+                        <ul class="text-xs space-y-1 text-left w-full pl-5 list-disc text-text-muted">
+                            <li>Replace, combine or clear collections</li>
+                            <li>Edit GIF metadata and ordering</li>
+                            <li>Requires Discord account token</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-gray-2 rounded-default p-6 flex flex-col items-center h-full">
+                        <div class="relative">
+                            <svg class="w-16 h-16 text-gray-4 mb-4 transition-colors" viewBox="0 0 512 512">
+                                <path fill="currentColor"
+                                    d="M128 64c0-35.3 28.7-64 64-64H352V128c0 17.7 14.3 32 32 32H512V448c0 35.3-28.7 64-64 64H192c-35.3 0-64-28.7-64-64V336H302.1l-39 39c-9.4 9.4-9.4 24.6 0 33.9s24.6 9.4 33.9 0l80-80c9.4-9.4 9.4-24.6 0-33.9l-80-80c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9l39 39H128V64zm0 224v48H24c-13.3 0-24-10.7-24-24s10.7-24 24-24H128zM512 128H384V0L512 128z">
+                                </path>
+                            </svg>
+                            <div
+                                class="absolute -inset-2 border-2 border-blue-400 rounded-default opacity-0 transition-opacity pointer-events-none">
+                            </div>
+                        </div>
+                        <h2 class="text-xl font-bold mb-3 text-center">LOCAL EDIT</h2>
+                        <p class="text-sm text-center text-text-muted mb-4">
+                            Work with exported collections offline without connecting to Discord
+                        </p>
+                        <ul class="text-xs space-y-1 text-left w-full pl-5 list-disc text-text-muted">
+                            <li>Import JSON or Base64 files</li>
+                            <li>Edit and reorganize collections</li>
+                            <li>Export for later use</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-gray-2 rounded-default p-6 col-span-1 md:col-span-2 border-l-4 border-yellow-400">
+                        <div class="flex flex-col md:flex-row items-center gap-4">
+                            <div class="flex-shrink-0">
+                                <svg class="w-12 h-12 text-yellow-400" viewBox="0 0 512 512">
+                                    <path fill="currentColor"
+                                        d="M256 32c14.2 0 27.3 7.5 34.5 19.8l216 368c7.3 12.4 7.3 27.7 .2 40.1S486.3 480 472 480H40c-14.3 0-27.6-7.7-34.7-20.1s-7-27.8 .2-40.1l216-368C228.7 39.5 241.8 32 256 32zm0 128c-13.3 0-24 10.7-24 24V296c0 13.3 10.7 24 24 24s24-10.7 24-24V184c0-13.3-10.7-24-24-24zm32 224a32 32 0 1 0 -64 0 32 32 0 1 0 64 0z">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-bold mb-2 text-yellow-400">SECURITY DISCLAIMER</h3>
+                                <p class="text-sm">
+                                    All token handling is done client-side
+                                    (other than required Discord API requests).
+                                    <span class="font-semibold">We never see or store your credentials.</span>
+                                </p>
+                                <div class="mt-3 text-xs bg-gray-3 p-2 rounded-default">
+                                    Discord tokens can be revoked at
+                                    any time by changing your account password.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-4 w-full">
+                <button id="TokenLoginBtn"
+                    class="flex-1 h-12 rounded-default bg-gray-4 hover:bg-gray-3 text-black font-bold text-lg transition-colors">
+                    TOKEN LOGIN
+                </button>
+                <button id="LocalEditBtn"
+                    class="flex-1 h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg transition-colors">
+                    LOCAL EDIT
+                </button>
+            </div>
+        </section>
+
+        <!-- Token Input Section -->
+        <section id="TokenSection" class="hidden w-full h-full flex flex-col p-8 gap-4">
+            <header class="w-full bg-gray-1 rounded-default p-4 text-center">
+                <h1 class="text-3xl font-bold">TOKEN VERIFICATION</h1>
+            </header>
+
+            <div class="bg-gray-1 rounded-default w-full flex-1 min-h-0 flex flex-col items-center justify-center p-8">
+                <div class="bg-transparent rounded-default p-6 flex flex-col items-center">
+                    <h2 class="text-xl font-bold mb-3 text-center">TOKEN SAFETY</h2>
+                    <p class="text-sm text-center text-text-muted mb-4">
+                        Your Discord token is handled securely and never stored
+                    </p>
+                    <ul class="text-xs space-y-1 text-center list-disc text-text-muted-more w-fit mx-auto pl-5">
+                        <p>All processing happens in your browser</p>
+                        <p>No server-side storage or logging</p>
+                        <p>Token only used for Discord API requests</p>
+                    </ul>
+                </div>
+                <div id="TokenStatusMessage"
+                    class="mt-4 text-sm px-4 py-2 rounded-default hidden w-full max-w-md text-center"></div>
+            </div>
+
+            <div class="flex gap-4 w-full">
+                <button
+                    class="BackToStartBtn flex-1 h-12 rounded-default bg-gray-1 hover:bg-gray-2 font-bold text-lg transition-colors">
+                    BACK TO START
+                </button>
+                <button id="PasteTokenBtn"
+                    class="flex-1 h-12 rounded-default bg-gray-4 hover:bg-gray-3 text-black font-bold text-lg transition-colors">
+                    PASTE TOKEN
+                </button>
+            </div>
+        </section>
+
+        <!-- Discord Actions Section -->
+        <section id="DiscordActionsSection" class="hidden w-full h-full flex flex-col p-8 gap-4">
+            <header class="w-full bg-gray-1 rounded-default p-4 text-center">
+                <h1 class="text-3xl font-bold">MANAGE GIF COLLECTION</h1>
+            </header>
+
+            <div class="bg-gray-1 rounded-default w-full flex-1 min-h-0 p-8 overflow-y-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                    <div class="bg-gray-2 rounded-default p-6 flex flex-col items-center h-full group">
+                        <svg class="w-16 h-16 text-gray-4 mb-4 group-hover:text-white transition-colors"
+                            viewBox="0 0 512 512">
+                            <path fill="currentColor"
+                                d="M464 256A208 208 0 1 0 48 256a208 208 0 1 0 416 0zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256zm169.8-90.7c7.9-22.3 29.1-37.3 52.8-37.3h58.3c34.9 0 63.1 28.3 63.1 63.1c0 22.6-12.1 43.5-31.7 54.8L280 264.4c-.2 13-10.9 23.6-24 23.6c-13.3 0-24-10.7-24-24V250.5c0-8.6 4.6-16.5 12.1-20.8l44.3-25.4c4.7-2.7 7.6-7.7 7.6-13.1c0-8.4-6.8-15.1-15.1-15.1H222.6c-3.4 0-6.4 2.1-7.5 5.3l-.4 1.2c-4.4 12.5-18.2 19-30.6 14.6s-19-18.2-14.6-30.6l.4-1.2zM224 352a32 32 0 1 1 64 0 32 32 0 1 1 -64 0z">
+                            </path>
+                        </svg>
+                        <h2 class="text-xl font-bold mb-3 text-center">GET CURRENT</h2>
+                        <p class="text-sm text-center text-text-muted">
+                            Download your current GIF collection from Discord
+                        </p>
+                    </div>
+
+                    <div class="bg-gray-2 rounded-default p-6 flex flex-col items-center h-full group">
+                        <svg class="w-16 h-16 text-gray-4 mb-4 group-hover:text-white transition-colors"
+                            viewBox="0 0 512 512">
+                            <path fill="currentColor"
+                                d="M367.2 412.5L99.5 144.8C77.1 176.1 64 214.5 64 256c0 106 86 192 192 192c41.5 0 79.9-13.1 111.2-35.5zm45.3-45.3C434.9 335.9 448 297.5 448 256c0-106-86-192-192-192c-41.5 0-79.9 13.1-111.2 35.5L412.5 367.2zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256z">
+                            </path>
+                        </svg>
+                        <h2 class="text-xl font-bold mb-3 text-center">CLEAR ALL</h2>
+                        <p class="text-sm text-center text-text-muted">
+                            Remove all GIFs from your Discord collection
+                        </p>
+                    </div>
+
+                    <div class="bg-gray-2 rounded-default p-6 flex flex-col items-center h-full group">
+                        <svg class="w-16 h-16 text-gray-4 mb-4 group-hover:text-white transition-colors"
+                            viewBox="0 0 512 512">
+                            <path fill="currentColor"
+                                d="M142.9 142.9c62.2-62.2 162.7-62.5 225.3-1L327 183c-6.9 6.9-8.9 17.2-5.2 26.2s12.5 14.8 22.2 14.8H463.5c0 0 0 0 0 0H472c13.3 0 24-10.7 24-24V72c0-9.7-5.8-18.5-14.8-22.2s-19.3-1.7-26.2 5.2L413.4 96.6c-87.6-86.5-228.7-86.2-315.8 1C73.2 122 55.6 150.7 44.8 181.4c-5.9 16.7 2.9 34.9 19.5 40.8s34.9-2.9 40.8-19.5c7.7-21.8 20.2-42.3 37.8-59.8zM16 312v7.6 .7V440c0 9.7 5.8 18.5 14.8 22.2s19.3 1.7 26.2-5.2l41.6-41.6c87.6 86.5 228.7 86.2 315.8-1c24.4-24.4 42.1-53.1 52.9-83.7c5.9-16.7-2.9-34.9-19.5-40.8s-34.9 2.9-40.8 19.5c-7.7 21.8-20.2 42.3-37.8 59.8c-62.2 62.2-162.7 62.5-225.3 1L185 329c6.9-6.9 8.9-17.2 5.2-26.2s-12.5-14.8-22.2-14.8H48.4h-.7H40c-13.3 0-24 10.7-24 24z">
+                            </path>
+                        </svg>
+                        <h2 class="text-xl font-bold mb-3 text-center">REPLACE</h2>
+                        <p class="text-sm text-center text-text-muted">
+                            Replace your current collection with a new one
+                        </p>
+                    </div>
+
+                    <div class="bg-gray-2 rounded-default p-6 flex flex-col items-center h-full group">
+                        <svg class="w-16 h-16 text-gray-4 mb-4 group-hover:text-white transition-colors"
+                            viewBox="0 0 576 512">
+                            <path fill="currentColor"
+                                d="M78.6 5C69.1-2.4 55.6-1.5 47 7L7 47c-8.5 8.5-9.4 22-2.1 31.6l80 104c4.5 5.9 11.6 9.4 19 9.4h54.1l109 109c-14.7 29-10 65.4 14.3 89.6l112 112c24.2 24.2 60.6 29 89.6 14.3l109 109V408c0 7.5 3.5 14.5 9.4 19l104 80c9.6 7.3 23.1 6.3 31.6-2.1l40-40c8.5-8.5 9.4-22 2.1-31.6l-80-104c-4.5-5.9-11.6-9.4-19-9.4H408c-6.7 0-13-2.8-17.6-7.5l-3.9-4.2l-85-85l-5.4-5.5L169.4 288H112c-7.5 0-14.5-3.5-19-9.4L5 78.6C-2.4 69.1-1.5 55.6 7 47L47 7c8.5-8.5 22-9.4 31.6-2.1zM19.9 396.1L7 473c-4.5 4.5-5.4 11-2.5 16.4S14 496 20 496l76.9-12.9L396.1 19.9l-5.5-5.5L19.9 396.1zM512 160a96 96 0 1 0 -192 0a96 96 0 1 0 192 0zm-96-64a64 64 0 1 1 0 128a64 64 0 1 1 0-128z">
+                            </path>
+                        </svg>
+                        <h2 class="text-xl font-bold mb-3 text-center">COMBINE</h2>
+                        <p class="text-sm text-center text-text-muted">
+                            Add new GIFs to your existing collection
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-4 w-full">
+                <div class="flex gap-4 w-full">
+                    <button id="GetCurrentCollectionBtn"
+                        class="flex-1 h-12 rounded-default bg-gray-4 hover:bg-gray-3 text-black font-bold text-lg transition-colors">
+                        GET CURRENT
+                    </button>
+                </div>
+
+                <div class="flex gap-4 w-full">
+                    <button id="CombineCollectionBtn"
+                        class="flex-1 h-12 rounded-default bg-gray-3 hover:bg-gray-4 font-bold text-lg transition-colors">
+                        COMBINE
+                    </button>
+                    <button id="ReplaceCollectionBtn"
+                        class="flex-1 h-12 rounded-default bg-gray-3 hover:bg-gray-4 font-bold text-lg transition-colors">
+                        REPLACE
+                    </button>
+                </div>
+
+                <div class="flex gap-4 w-full">
+                    <button id="ClearCollectionBtn"
+                        class="flex-1 h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg transition-colors">
+                        CLEAR ALL
+                    </button>
+                </div>
+
+                <div class="flex gap-4 w-full">
+                    <button
+                        class="BackToStartBtn flex-1 h-12 rounded-default bg-gray-1 hover:bg-gray-2 font-bold text-lg transition-colors">
+                        BACK TO START
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Collection Input Section -->
+        <section id="CollectionInputSection" class="hidden w-full h-full flex flex-col p-8 gap-4">
+            <header class="w-full bg-gray-1 rounded-default p-4 text-center">
+                <h1 class="text-3xl font-bold" id="CollectionInputTitle">ADD COLLECTIONS</h1>
+            </header>
+
+            <div class="bg-gray-1 rounded-default w-full flex-1 min-h-0 p-4 overflow-y-auto">
+                <div class="grid grid-cols-1 gap-4 mb-4" id="CollectionListContainer">
+                    <div class="bg-gray-2 rounded-default p-4 flex items-center justify-center h-40">
+                        <p class="text-text-muted">No collections added yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-4 w-full">
+                <div class="flex gap-4 w-full">
+                    <div class="text-center w-full">
+                        <button id="PasteCollectionBtn"
+                            class="w-full h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg transition-colors">
+                            PASTE FROM CLIPBOARD (BASE64, JSON)
+                        </button>
+                    </div>
+                    <div class="text-center w-full">
+                        <input type="file" id="FileInput" accept=".bin,.json" class="hidden">
+                        <button id="FileCollectionBtn"
+                            class="w-full h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg transition-colors">
+                            IMPORT FROM FILE (.bin, .json)
+                        </button>
+                    </div>
+                </div>
+
+
+                <div class="flex gap-4 w-full">
+                    <button id="ContinueWithCollectionsBtn"
+                        class="flex-1 h-12 rounded-default bg-gray-4 hover:bg-gray-3 text-black font-bold text-lg transition-colors">
+                        CONTINUE
+                    </button>
+                    <button
+                        class="BackToStartBtn flex-1 h-12 rounded-default bg-gray-1 hover:bg-gray-2 font-bold text-lg transition-colors">
+                        BACK TO START
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Layout Edit Section -->
+        <section id="LayoutSection" class="hidden w-full h-full flex flex-col p-8 gap-4">
+            <header class="w-full bg-gray-1 rounded-default p-4 text-center">
+                <h1 class="text-3xl font-bold">ORDER/CLEAN GIFS</h1>
+            </header>
+
+            <div id="SortableContainer" class="bg-gray-1 rounded-default w-full flex-1 min-h-0 overflow-y-auto p-4">
+
+            </div>
+
+            <div class="flex gap-4 w-full items-center">
+                <button
+                    class="BackToStartBtn flex-1 h-12 rounded-default bg-gray-1 hover:bg-gray-2 font-bold text-lg transition-colors">
+                    BACK TO START
+                </button>
+                <button id="ProceedToExportBtn"
+                    class="flex-1 h-12 rounded-default bg-gray-4 hover:bg-gray-3 text-black font-bold text-lg transition-colors">
+                    EXPORT GIFS
+                </button>
+                <button id="UndoBtn"
+                    class="w-24 h-12 rounded-default bg-gray-1 hover:bg-gray-2 font-bold text-lg transition-colors hidden">
+                    UNDO
+                </button>
+            </div>
+        </section>
+
+        <!-- Export Section -->
+        <section id="ExportSection" class="hidden w-full h-full flex flex-col p-8 gap-4">
+            <header class="w-full bg-gray-1 rounded-default p-4 text-center">
+                <h1 class="text-3xl font-bold">EXPORT GIFS</h1>
+            </header>
+
+            <div class="flex-1 bg-gray-1 rounded-default p-4 overflow-y-auto w-full relative">
+                <pre id="ExportPreview" class="text-sm whitespace-pre-wrap pb-8"></pre>
+            </div>
+
+            <div class="flex flex-col gap-4 w-full">
+                <div class="grid grid-cols-2 gap-4 w-full">
+                    <button id="ViewJsonBtn"
+                        class="h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg transition-colors">
+                        VIEW JSON
+                    </button>
+                    <button id="ViewBase64Btn"
+                        class="h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg transition-colors">
+                        VIEW BASE64
+                    </button>
+                    <button id="CopyJsonBtn"
+                        class="h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg transition-colors">
+                        COPY JSON
+                    </button>
+                    <button id="CopyBase64Btn"
+                        class="h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg transition-colors">
+                        COPY BASE64
+                    </button>
+                    <button id="FinalExportJsonBtn"
+                        class="h-12 rounded-default bg-gray-4 hover:bg-gray-3 text-black font-bold text-lg transition-colors">
+                        EXPORT JSON
+                    </button>
+                    <button id="FinalExportBase64Btn"
+                        class="h-12 rounded-default bg-gray-4 hover:bg-gray-3 text-black font-bold text-lg transition-colors">
+                        EXPORT BASE64
+                    </button>
+                </div>
+
+                <button id="BackToLayoutBtn"
+                    class="w-full h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg transition-colors">
+                    BACK
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <div
+        class="fixed bottom-4 right-4 opacity-50 hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 text-text-muted z-50">
+        <a href="https://github.com/Necraxis/Discord-GIF-Collection-Manager" target="_blank" rel="noopener noreferrer"
+            class="text-current">
+            <i class="fab fa-github"></i>
+        </a>
+        <span>Made by Necraxis with ❤️</span>
+    </div>
+</body>
+
+</html>
