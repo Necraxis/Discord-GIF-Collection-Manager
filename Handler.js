@@ -420,9 +420,9 @@ class GifCurator {
             let CombinedGifs = []
             let CurrentIndex = 1
             const [lockedCollection, ...otherCollections] = this.State.Collections
-            const collectionsToProcess = [lockedCollection, ...otherCollections.reverse()]
+            const CollectionsToProcess = [lockedCollection, ...otherCollections.reverse()]
 
-            collectionsToProcess.forEach(Collection => {
+            CollectionsToProcess.forEach(Collection => {
                 const Sorted = [...Collection.gifs.favorites].sort((a, b) => (a.metadata?.e || 0) - (b.metadata?.e || 0))
                 Sorted.forEach(GIF => {
                     if (!GIF.metadata) GIF.metadata = {}
@@ -515,8 +515,12 @@ class GifCurator {
     }
 
     RenderGifGrid() {
-        this.Elements.SortableContainer.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 w-full" id="GifGridContainer"></div>`
-        const GridContainer = document.getElementById("GifGridContainer")
+        const GridContainer = document.createElement("div")
+        GridContainer.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 w-full"
+        GridContainer.id = "GifGridContainer"
+        this.Elements.SortableContainer.innerHTML = ""
+        this.Elements.SortableContainer.appendChild(GridContainer)
+
         const SortedGifs = [...this.State.FilteredGifs].sort((A, B) => (B.metadata?.e || 0) - (A.metadata?.e || 0))
         const UpdatedGifs = SortedGifs.map((Gif, Index) => ({
             ...Gif,
@@ -531,35 +535,17 @@ class GifCurator {
         UpdatedGifs.forEach((Gif, DisplayIndex) => {
             const GifUrl = Gif.metadata?.src || Gif.url
             const Item = document.createElement("div")
-            Item.className = "relative bg-gray-2 rounded-default h-64 w-full overflow-hidden transform-gpu"
+            Item.className = "relative bg-gray-2 rounded-default h-64 w-full overflow-hidden"
             Item.dataset.index = DisplayIndex
-            Item.style.willChange = "transform"
 
             const ImgContainer = document.createElement("div")
             ImgContainer.className = "bg-transparent relative w-full h-full"
 
             const Img = document.createElement("img")
-            Img.className = "absolute inset-0 w-full h-full object-contain opacity-0 transition-opacity duration-300"
+            Img.className = "absolute inset-0 w-full h-full object-contain"
             Img.loading = "lazy"
             Img.decoding = "async"
             Img.src = GifUrl
-
-            const LoadingSpinner = document.createElement("div")
-            LoadingSpinner.className = "loading-spinner absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-8 w-8 border-t-2 border-b-2 border-gray-4 rounded-full"
-
-            const DeadImage = document.createElement("div")
-            DeadImage.className = "absolute inset-0 hidden flex flex-col items-center justify-center gap-2"
-            DeadImage.innerHTML = `<svg class="w-16 h-16 text-gray-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><p class="text-gray-4 font-bold">DEAD IMAGE</p>`
-
-            Img.onload = () => {
-                Img.classList.replace("opacity-0", "opacity-100")
-                LoadingSpinner.remove()
-            }
-
-            Img.onerror = () => {
-                LoadingSpinner.remove()
-                DeadImage.classList.remove("hidden")
-            }
 
             const PositionContainer = document.createElement("div")
             PositionContainer.className = "absolute top-2 left-2 flex items-center"
@@ -572,48 +558,6 @@ class GifCurator {
             PositionValue.className = "position-value text-sm font-bold text-white px-2 py-1 rounded-r bg-black bg-opacity-70 cursor-pointer"
             PositionValue.textContent = Gif.metadata?.e || "N/A"
 
-            const PositionInput = document.createElement("input")
-            PositionInput.type = "text"
-            PositionInput.className = "hidden text-sm font-bold text-white bg-black bg-opacity-90 px-2 py-1 rounded w-16 outline-none"
-            PositionInput.value = Gif.metadata?.e || ""
-
-            const InputWrapper = document.createElement("div")
-            InputWrapper.className = "absolute"
-            InputWrapper.style.left = "0"
-            InputWrapper.style.top = "0"
-            InputWrapper.appendChild(PositionInput)
-
-            PositionValue.addEventListener("click", () => {
-                const ValueRect = PositionValue.getBoundingClientRect()
-                InputWrapper.style.left = `${ValueRect.left - PositionContainer.getBoundingClientRect().left}px`
-                InputWrapper.style.top = "0"
-                PositionInput.style.width = `${ValueRect.width}px`
-                PositionInput.classList.remove("hidden")
-                PositionInput.focus()
-                PositionInput.select()
-            })
-
-            PositionInput.addEventListener("blur", () => {
-                PositionInput.classList.add("hidden")
-                const NewPos = parseInt(PositionInput.value)
-                const CurrentPos = Gif.metadata?.e || 1
-                const MaxPos = this.State.FilteredGifs.length
-
-                if (!isNaN(NewPos) && NewPos >= 1 && NewPos <= MaxPos && NewPos !== CurrentPos) {
-                    this.UpdateGifPosition(DisplayIndex, NewPos)
-                }
-            })
-
-            PositionInput.addEventListener("keydown", (E) => {
-                if (E.key === "Enter") {
-                    PositionInput.blur()
-                }
-            })
-
-            PositionContainer.appendChild(PosLabel)
-            PositionContainer.appendChild(PositionValue)
-            PositionContainer.appendChild(InputWrapper)
-
             const RemoveBtn = document.createElement("button")
             RemoveBtn.className = "remove-btn absolute right-2 top-2 w-7 h-7 rounded bg-black flex items-center justify-center text-white cursor-pointer"
             RemoveBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`
@@ -622,9 +566,40 @@ class GifCurator {
                 this.RemoveGif(DisplayIndex)
             })
 
-            ImgContainer.appendChild(LoadingSpinner)
+            PositionValue.addEventListener("click", () => {
+                const Input = document.createElement("input")
+                Input.type = "text"
+                Input.className = "text-sm font-bold text-white bg-black bg-opacity-90 px-2 py-1 rounded w-16 outline-none"
+                Input.value = Gif.metadata?.e || ""
+
+                PositionContainer.replaceChild(Input, PositionValue)
+                Input.focus()
+                Input.select()
+
+                const HandleBlur = () => {
+                    const NewPos = parseInt(Input.value)
+                    const CurrentPos = Gif.metadata?.e || 1
+                    const MaxPos = this.State.FilteredGifs.length
+
+                    if (!isNaN(NewPos) && NewPos >= 1 && NewPos <= MaxPos && NewPos !== CurrentPos) {
+                        this.UpdateGifPosition(DisplayIndex, NewPos)
+                    }
+                    PositionContainer.replaceChild(PositionValue, Input)
+                    Input.removeEventListener("blur", HandleBlur)
+                    Input.removeEventListener("keydown", HandleKeyDown)
+                }
+
+                const HandleKeyDown = (E) => {
+                    if (E.key === "Enter") HandleBlur()
+                }
+
+                Input.addEventListener("blur", HandleBlur)
+                Input.addEventListener("keydown", HandleKeyDown)
+            })
+
+            PositionContainer.appendChild(PosLabel)
+            PositionContainer.appendChild(PositionValue)
             ImgContainer.appendChild(Img)
-            ImgContainer.appendChild(DeadImage)
             Item.appendChild(ImgContainer)
             Item.appendChild(PositionContainer)
             Item.appendChild(RemoveBtn)
@@ -638,21 +613,9 @@ class GifCurator {
         }
 
         this.State.SortableInstance = new Sortable(GridContainer, {
-            animation: 200,
-            easing: "cubic-bezier(0.2, 0, 0.1, 1)",
+            animation: 150,
             ghostClass: "sortable-ghost",
-            chosenClass: "sortable-chosen",
-            dragClass: "sortable-drag",
-            forceFallback: true,
-            fallbackClass: "sortable-fallback",
-            fallbackOnBody: true,
-            fallbackTolerance: 3,
-            onStart: () => (document.body.style.cursor = "grabbing"),
-            onEnd: () => {
-                document.body.style.cursor = ""
-                this.UpdateLayoutOrder()
-            },
-            onMove: (Evt) => Evt.dragged !== Evt.related
+            onEnd: () => this.UpdateLayoutOrder()
         })
 
         this.UpdateUndoButton()
@@ -661,9 +624,7 @@ class GifCurator {
     UpdateGifPosition(CurrentIndex, NewPosition) {
         const UpdatedGifs = [...this.State.FilteredGifs]
         const TotalGifs = UpdatedGifs.length
-
         NewPosition = Math.max(1, Math.min(NewPosition, TotalGifs))
-
         const GifToMove = UpdatedGifs[CurrentIndex]
         const CurrentPos = GifToMove.metadata?.e || (TotalGifs - CurrentIndex)
 
@@ -671,23 +632,15 @@ class GifCurator {
 
         UpdatedGifs.forEach((Gif) => {
             if (!Gif.metadata) Gif.metadata = {}
-
             if (CurrentPos < NewPosition) {
-                if (Gif.metadata.e > CurrentPos && Gif.metadata.e <= NewPosition) {
-                    Gif.metadata.e -= 1
-                }
+                if (Gif.metadata.e > CurrentPos && Gif.metadata.e <= NewPosition) Gif.metadata.e -= 1
             } else {
-                if (Gif.metadata.e < CurrentPos && Gif.metadata.e >= NewPosition) {
-                    Gif.metadata.e += 1
-                }
+                if (Gif.metadata.e < CurrentPos && Gif.metadata.e >= NewPosition) Gif.metadata.e += 1
             }
         })
 
         GifToMove.metadata.e = NewPosition
-
-        UpdatedGifs.sort((A, B) => (A.metadata.e || 0) - (B.metadata.e || 0))
-
-        this.State.FilteredGifs = UpdatedGifs
+        this.State.FilteredGifs = UpdatedGifs.sort((A, B) => (A.metadata.e || 0) - (B.metadata.e || 0))
         this.RenderGifGrid()
 
         this.State.ActionHistory.push({
@@ -698,7 +651,6 @@ class GifCurator {
             beforeState: [...this.State.FilteredGifs]
         })
     }
-
 
     RemoveGif(Index) {
         this.State.ActionHistory.push({
@@ -738,11 +690,10 @@ class GifCurator {
         this.State.FilteredGifs = Items.map((Item, NewIndex) => {
             const OriginalIndex = parseInt(Item.dataset.index)
             const OriginalGif = this.State.FilteredGifs[OriginalIndex]
-            const metadata = OriginalGif.metadata || {}
             return {
                 ...OriginalGif,
                 metadata: {
-                    ...metadata,
+                    ...OriginalGif.metadata,
                     e: Items.length - NewIndex
                 }
             }
@@ -793,12 +744,10 @@ class GifCurator {
 
     GetExportData() {
         const ExportGifs = [...this.State.FilteredGifs].sort((A, B) => (A.metadata?.e || 0) - (B.metadata?.e || 0))
+
         return {
-            ...this.State.OriginalData,
-            gifs: {
-                ...this.State.OriginalData.gifs,
-                favorites: ExportGifs
-            }
+            metadata: { versionQ: 1, timesFavoritedQ: ExportGifs.length },
+            gifs: { favorites: ExportGifs, xQ: 0 },
         }
     }
 
