@@ -126,6 +126,7 @@ class GifCurator {
                 this.ShowStatusMessage("Please add at least one collection", "error")
                 return
             }
+
             if (this.State.CurrentAction === "replace") this.ReplaceCollection()
             else if (this.State.CurrentAction === "combine") this.CombineCollections()
         })
@@ -313,19 +314,13 @@ class GifCurator {
 
             if (this.State.CurrentAction === "combine" && this.State.Collections.length > 0 && this.State.Collections[0].Locked) {
                 this.State.Collections.push({
-                    ...Collection,
-                    gifs: {
-                        ...Collection.gifs,
-                        favorites: SortedGifs
-                    }
+                    metadata: { versionQ: 1, timesFavoritedQ: SortedGifs.length },
+                    gifs: { favorites: SortedGifs, xQ: 0 },
                 })
             } else {
                 this.State.Collections.push({
-                    ...Collection,
-                    gifs: {
-                        ...Collection.gifs,
-                        favorites: SortedGifs
-                    }
+                    metadata: { versionQ: 1, timesFavoritedQ: SortedGifs.length },
+                    gifs: { favorites: SortedGifs, xQ: 0 },
                 })
             }
             this.RenderCollectionList()
@@ -383,60 +378,64 @@ class GifCurator {
 
     async ReplaceCollection() {
         try {
-            if (this.State.Collections.length === 0) return
-            const NewCollection = this.State.Collections[this.State.Collections.length - 1]
-            let CurrentIndex = 1
-            const SortedGifs = [...NewCollection.gifs.favorites].sort((a, b) => (a.metadata?.e || 0) - (b.metadata?.e || 0))
-                .map(gif => {
-                    if (!gif.metadata) gif.metadata = {}
-                    return {
-                        ...gif,
-                        metadata: {
-                            ...gif.metadata,
-                            e: CurrentIndex++
-                        }
-                    }
-                })
-
-            this.State.OriginalData = {
-                ...NewCollection,
-                gifs: {
-                    ...NewCollection.gifs,
-                    favorites: SortedGifs
-                }
+            if (this.State.Collections.length === 0) {
+                throw new Error("Please add at least one collection")
             }
-            this.State.FilteredGifs = [...SortedGifs]
+
+            let CombinedGifs = []
+            let CurrentPosition = 1
+
+            const CollectionsCopy = [...this.State.Collections].reverse()
+            CollectionsCopy.forEach(Collection => {
+                const SortedGifs = [...Collection.gifs.favorites].sort(
+                    (A, B) => (A.metadata?.e || 0) - (B.metadata?.e || 0)
+                )
+
+                SortedGifs.forEach(Gif => {
+                    if (!Gif.metadata) Gif.metadata = {}
+                    Gif.metadata.e = CurrentPosition++
+                    CombinedGifs.push(Gif)
+                })
+            })
+
+            const UpdatedCollection = {
+                metadata: { versionQ: 1, timesFavoritedQ: CombinedGifs.length },
+                gifs: { favorites: CombinedGifs, xQ: 0 },
+            }
+
+            this.State.OriginalData = UpdatedCollection
+            this.State.FilteredGifs = [...CombinedGifs]
             this.ShowLayoutSection()
         } catch (Error) {
             this.ShowStatusMessage("Failed to replace collection: " + Error.message, "error")
         }
     }
 
-    async CombineCollections() {
+    CombineCollections() {
         try {
             if (this.State.Collections.length < 2) {
                 throw new Error("Please add at least one additional collection")
             }
-            let CombinedGifs = []
-            let CurrentIndex = 1
-            const [lockedCollection, ...otherCollections] = this.State.Collections
-            const CollectionsToProcess = [lockedCollection, ...otherCollections.reverse()]
 
-            CollectionsToProcess.forEach(Collection => {
-                const Sorted = [...Collection.gifs.favorites].sort((a, b) => (a.metadata?.e || 0) - (b.metadata?.e || 0))
-                Sorted.forEach(GIF => {
-                    if (!GIF.metadata) GIF.metadata = {}
-                    GIF.metadata.e = CurrentIndex++
-                    CombinedGifs.push(GIF)
+            let CombinedGifs = []
+            let CurrentPosition = 1
+
+            const CollectionsCopy = [...this.State.Collections].reverse()
+            CollectionsCopy.forEach(Collection => {
+                const SortedGifs = [...Collection.gifs.favorites].sort(
+                    (A, B) => (A.metadata?.e || 0) - (B.metadata?.e || 0)
+                )
+
+                SortedGifs.forEach(Gif => {
+                    if (!Gif.metadata) Gif.metadata = {}
+                    Gif.metadata.e = CurrentPosition++
+                    CombinedGifs.push(Gif)
                 })
             })
 
             const UpdatedCollection = {
-                ...this.State.Collections[0],
-                gifs: {
-                    ...this.State.Collections[0].gifs,
-                    favorites: CombinedGifs
-                }
+                metadata: { versionQ: 1, timesFavoritedQ: CombinedGifs.length },
+                gifs: { favorites: CombinedGifs, xQ: 0 },
             }
 
             this.State.OriginalData = UpdatedCollection
@@ -500,14 +499,11 @@ class GifCurator {
 
     ProcessJsonData(JsonData) {
         if (JsonData.gifs?.favorites?.length > 0) {
-            this.State = {
-                ...this.State,
-                OriginalData: JsonData,
-                FilteredGifs: [...JsonData.gifs.favorites],
-                ActionHistory: [],
-                SortableInstance: null,
-                RemovedGifs: []
-            }
+            this.State.OriginalData = JsonData
+            this.State.FilteredGifs = JsonData.gifs.favorites
+            this.State.ActionHistory = []
+            this.State.SortableInstance = null
+            this.State.RemovedGifs = []
             this.ShowLayoutSection()
         } else {
             this.ShowStatusMessage("No GIFs found in data", "error")
@@ -523,9 +519,12 @@ class GifCurator {
 
         const SortedGifs = [...this.State.FilteredGifs].sort((A, B) => (B.metadata?.e || 0) - (A.metadata?.e || 0))
         const UpdatedGifs = SortedGifs.map((Gif, Index) => ({
-            ...Gif,
+            url: Gif.url,
             metadata: {
-                ...Gif.metadata,
+                format: Gif.metadata.format,
+                src: Gif.metadata.src,
+                width: Gif.metadata.width,
+                height: Gif.metadata.height,
                 e: SortedGifs.length - Index
             }
         }))
@@ -584,6 +583,7 @@ class GifCurator {
                     if (!isNaN(NewPos) && NewPos >= 1 && NewPos <= MaxPos && NewPos !== CurrentPos) {
                         this.UpdateGifPosition(DisplayIndex, NewPos)
                     }
+
                     PositionContainer.replaceChild(PositionValue, Input)
                     Input.removeEventListener("blur", HandleBlur)
                     Input.removeEventListener("keydown", HandleKeyDown)
@@ -622,60 +622,62 @@ class GifCurator {
     }
 
     UpdateGifPosition(CurrentIndex, NewPosition) {
+        const BeforeState = JSON.parse(JSON.stringify(this.State.FilteredGifs))
         const UpdatedGifs = [...this.State.FilteredGifs]
         const TotalGifs = UpdatedGifs.length
         NewPosition = Math.max(1, Math.min(NewPosition, TotalGifs))
-        const GifToMove = UpdatedGifs[CurrentIndex]
-        const CurrentPos = GifToMove.metadata?.e || (TotalGifs - CurrentIndex)
 
+        const GifToMove = UpdatedGifs[CurrentIndex]
+        if (!GifToMove) return
+
+        if (!GifToMove.metadata) GifToMove.metadata = {}
+
+        const CurrentPos = GifToMove.metadata.e || (TotalGifs - CurrentIndex)
         if (CurrentPos === NewPosition) return
 
-        UpdatedGifs.forEach((Gif) => {
-            if (!Gif.metadata) Gif.metadata = {}
+        UpdatedGifs.forEach(gif => {
+            if (!gif.metadata) gif.metadata = {}
+
             if (CurrentPos < NewPosition) {
-                if (Gif.metadata.e > CurrentPos && Gif.metadata.e <= NewPosition) Gif.metadata.e -= 1
+                if (gif.metadata.e > CurrentPos && gif.metadata.e <= NewPosition) {
+                    gif.metadata.e -= 1
+                }
             } else {
-                if (Gif.metadata.e < CurrentPos && Gif.metadata.e >= NewPosition) Gif.metadata.e += 1
+                if (gif.metadata.e < CurrentPos && gif.metadata.e >= NewPosition) {
+                    gif.metadata.e += 1
+                }
             }
         })
 
         GifToMove.metadata.e = NewPosition
-        this.State.FilteredGifs = UpdatedGifs.sort((A, B) => (A.metadata.e || 0) - (B.metadata.e || 0))
-        this.RenderGifGrid()
+        this.State.FilteredGifs = UpdatedGifs.sort((a, b) => (a.metadata.e || 0) - (b.metadata.e || 0))
 
         this.State.ActionHistory.push({
-            action: "reposition",
-            fromIndex: CurrentIndex,
-            fromPosition: CurrentPos,
-            toPosition: NewPosition,
-            beforeState: [...this.State.FilteredGifs]
+            Action: "reposition",
+            BeforeState: BeforeState,
         })
+
+        this.RenderGifGrid()
+        this.UpdateUndoButton()
     }
 
     RemoveGif(Index) {
         this.State.ActionHistory.push({
-            action: "remove",
-            gif: this.State.FilteredGifs[Index],
-            index: Index,
-            beforeState: [...this.State.FilteredGifs]
+            Action: "remove",
+            BeforeState: [...this.State.FilteredGifs]
         })
         this.State.FilteredGifs.splice(Index, 1)
-        this.State.RemovedGifs.push(Index)
         this.RenderGifGrid()
     }
 
     HandleUndo() {
         if (this.State.ActionHistory.length === 0) return
-        const LastAction = this.State.ActionHistory.pop()
 
-        if (LastAction.action === "remove") {
-            this.State.FilteredGifs.splice(LastAction.index, 0, LastAction.gif)
-        }
-        else if (LastAction.action === "reposition") {
-            this.State.FilteredGifs = LastAction.beforeState
-        }
+        const LastAction = this.State.ActionHistory.pop()
+        this.State.FilteredGifs = JSON.parse(JSON.stringify(LastAction.BeforeState))
 
         this.RenderGifGrid()
+        this.UpdateUndoButton()
     }
 
     UpdateUndoButton() {
@@ -686,18 +688,31 @@ class GifCurator {
     UpdateLayoutOrder() {
         const GridContainer = document.getElementById("GifGridContainer")
         if (!GridContainer) return
+
+        const BeforeState = [...this.State.FilteredGifs]
+
         const Items = Array.from(GridContainer.children)
         this.State.FilteredGifs = Items.map((Item, NewIndex) => {
             const OriginalIndex = parseInt(Item.dataset.index)
             const OriginalGif = this.State.FilteredGifs[OriginalIndex]
+
             return {
-                ...OriginalGif,
+                url: OriginalGif.url,
                 metadata: {
-                    ...OriginalGif.metadata,
+                    format: OriginalGif.metadata.format,
+                    src: OriginalGif.metadata.src,
+                    width: OriginalGif.metadata.width,
+                    height: OriginalGif.metadata.height,
                     e: Items.length - NewIndex
                 }
             }
         })
+
+        this.State.ActionHistory.push({
+            Action: "reorder",
+            BeforeState: BeforeState
+        })
+
         this.RenderGifGrid()
     }
 
