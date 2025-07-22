@@ -100,8 +100,7 @@ location.reload(),alert(JSON.parse(document.body.appendChild(document.createElem
 <br></br>
 <br></br>
 
-**<span style="font-size: 40px;">Made with ❤️ by <a href="https://github.com/Necraxis/Discord-GIF-Collection-Manager">Necraxis</a></span>**
-
-**<span style="font-size: 20px;">Give this repo a ⭐ if you like this project!</span>**
+### **Made with ❤️ by <a href="https://github.com/Necraxis/Discord-GIF-Collection-Manager">Necraxis</a>**
+#### **Give this repo a ⭐ if you like this project!**
 
 </div>
