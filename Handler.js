@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ActiveOperations: new Set()
     }
 
-    const Interface = {
+    let Interface = {
         StartScreen: document.getElementById("LoginSection"),
         AuthScreen: document.getElementById("TokenSection"),
         MainActionsScreen: document.getElementById("DiscordActionsSection"),
@@ -241,19 +241,36 @@ document.addEventListener("DOMContentLoaded", function () {
         ShowJsonPreview()
 
         if (AppData.AuthenticationToken) {
-            const AutoUpdateBtn = document.createElement("button")
-            AutoUpdateBtn.className = "w-full h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg"
-            AutoUpdateBtn.textContent = "UPDATE DISCORD COLLECTION AUTOMATICALLY"
-            AutoUpdateBtn.addEventListener("click", UpdateDiscordCollection)
+            if (!Interface.UpdateDiscordCollectionBtn) {
+                Interface.UpdateDiscordCollectionBtn = document.createElement("button")
+                Interface.UpdateDiscordCollectionBtn.className = "discord-auto-update-btn w-full h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg hidden"
+                Interface.UpdateDiscordCollectionBtn.textContent = "UPDATE DISCORD COLLECTION"
+                Interface.UpdateDiscordCollectionBtn.addEventListener("click", function () {
+                    if (AppData.ActiveOperations.has("AutoUpdate")) return
+                    AppData.ActiveOperations.add("AutoUpdate")
+                    SetButtonState(Interface.UpdateDiscordCollectionBtn, true)
 
-            const ButtonContainer = Interface.OutputScreen.querySelector(".flex.flex-col")
-            if (ButtonContainer) {
-                const BackBtn = ButtonContainer.querySelector("#BackToLayoutBtn")
-                if (BackBtn) {
-                    ButtonContainer.insertBefore(AutoUpdateBtn, BackBtn)
-                } else {
-                    ButtonContainer.appendChild(AutoUpdateBtn)
+                    UpdateDiscordCollection().finally(function () {
+                        AppData.ActiveOperations.delete("AutoUpdate")
+                        SetButtonState(Interface.UpdateDiscordCollectionBtn, false)
+                    })
+                })
+
+                const ButtonContainer = Interface.OutputScreen.querySelector(".flex.flex-col")
+                if (ButtonContainer) {
+                    const BackBtn = ButtonContainer.querySelector("#BackToLayoutBtn")
+                    if (BackBtn) {
+                        ButtonContainer.insertBefore(Interface.UpdateDiscordCollectionBtn, BackBtn)
+                    } else {
+                        ButtonContainer.appendChild(Interface.UpdateDiscordCollectionBtn)
+                    }
                 }
+            }
+
+            Interface.UpdateDiscordCollectionBtn.classList.remove("hidden")
+        } else {
+            if (Interface.UpdateDiscordCollectionBtn) {
+                Interface.UpdateDiscordCollectionBtn.classList.add("hidden")
             }
         }
     }
