@@ -568,114 +568,136 @@ document.addEventListener("DOMContentLoaded", function () {
         const GridContainer = document.createElement("div")
         GridContainer.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 w-full"
         GridContainer.id = "GifEditGrid"
+
         Interface.EditingArea.innerHTML = ""
         Interface.EditingArea.appendChild(GridContainer)
 
-        const SortedByPosition = [...AppData.GifItemList].sort(function (A, B) {
-            return (B.metadata?.e || 0) - (A.metadata?.e || 0)
-        })
-        const UpdatedGifList = SortedByPosition.map(function (Gif, Index) {
-            return {
+        const UpdatedGifList = [...AppData.GifItemList]
+            .sort((A, B) => (B.metadata?.e || 0) - (A.metadata?.e || 0))
+            .map((Gif, Index, Arr) => ({
                 url: Gif.url,
                 metadata: {
                     format: Gif.metadata.format,
                     src: Gif.metadata.src,
                     width: Gif.metadata.width,
                     height: Gif.metadata.height,
-                    e: SortedByPosition.length - Index
+                    e: Arr.length - Index
                 }
-            }
-        })
+            }))
+
         AppData.GifItemList = UpdatedGifList
 
-        const DocumentFragment = document.createDocumentFragment()
-        UpdatedGifList.forEach(function (Gif, DisplayIndex) {
-            const ImageUrl = Gif.metadata?.src || Gif.url
-            const GifItem = document.createElement("div")
-            GifItem.className = "relative bg-gray-2 rounded-default h-64 w-full overflow-hidden"
-            GifItem.dataset.index = DisplayIndex
-
-            const ImageContainer = document.createElement("div")
-            ImageContainer.className = "bg-transparent relative w-full h-full"
-
-            const Image = document.createElement("img")
-            Image.className = "absolute inset-0 w-full h-full object-contain"
-            Image.loading = "lazy"
-            Image.decoding = "async"
-            Image.src = ImageUrl
-
-            const PositionDisplay = document.createElement("div")
-            PositionDisplay.className = "absolute top-2 left-2 flex items-center"
-
-            const PositionLabel = document.createElement("span")
-            PositionLabel.className = "text-sm font-bold text-white px-2 py-1 rounded-l bg-black bg-opacity-70"
-            PositionLabel.textContent = "Pos"
-
-            const PositionNumber = document.createElement("span")
-            PositionNumber.className = "position-value text-sm font-bold text-white px-2 py-1 rounded-r bg-black bg-opacity-70 cursor-pointer"
-            PositionNumber.textContent = Gif.metadata?.e || "N/A"
-
-            const DeleteButton = document.createElement("button")
-            DeleteButton.className = "remove-btn absolute right-2 top-2 w-7 h-7 rounded bg-black flex items-center justify-center text-white cursor-pointer"
-            DeleteButton.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`
-            DeleteButton.addEventListener("click", function (Event) {
-                Event.stopPropagation()
-                RemoveGifItem(DisplayIndex)
+        const OptimizedUrls = new Map()
+        UpdatedGifList.forEach((Gif, Index) => {
+            const OriginalUrl = Gif.metadata?.src || Gif.url
+            const OptimizedUrl = new URL(OriginalUrl)
+            OptimizedUrl.searchParams.set("width", Math.floor(Gif.metadata.width / 2))
+            OptimizedUrl.searchParams.set("height", Math.floor(Gif.metadata.height / 2))
+            OptimizedUrls.set(Index, {
+                optimized: OptimizedUrl.toString(),
+                original: OriginalUrl
             })
-
-            PositionNumber.addEventListener("click", function () {
-                const InputField = document.createElement("input")
-                InputField.type = "text"
-                InputField.className = "text-sm font-bold text-white bg-black bg-opacity-90 px-2 py-1 rounded w-16 outline-none"
-                InputField.value = Gif.metadata?.e || ""
-
-                PositionDisplay.replaceChild(InputField, PositionNumber)
-                InputField.focus()
-                InputField.select()
-
-                const HandleInputComplete = function () {
-                    const NewPosition = parseInt(InputField.value)
-                    const CurrentPosition = Gif.metadata?.e || 1
-                    const MaxPosition = AppData.GifItemList.length
-
-                    if (!isNaN(NewPosition) && NewPosition >= 1 && NewPosition <= MaxPosition && NewPosition !== CurrentPosition) {
-                        UpdateGifPosition(DisplayIndex, NewPosition)
-                    }
-
-                    PositionDisplay.replaceChild(PositionNumber, InputField)
-                    InputField.removeEventListener("blur", HandleInputComplete)
-                    InputField.removeEventListener("keydown", HandleInputKeyPress)
-                }
-
-                const HandleInputKeyPress = function (Event) {
-                    if (Event.key === "Enter") HandleInputComplete()
-                }
-
-                InputField.addEventListener("blur", HandleInputComplete)
-                InputField.addEventListener("keydown", HandleInputKeyPress)
-            })
-
-            PositionDisplay.appendChild(PositionLabel)
-            PositionDisplay.appendChild(PositionNumber)
-            ImageContainer.appendChild(Image)
-            GifItem.appendChild(ImageContainer)
-            GifItem.appendChild(PositionDisplay)
-            GifItem.appendChild(DeleteButton)
-            DocumentFragment.appendChild(GifItem)
         })
 
-        GridContainer.appendChild(DocumentFragment)
+        const FastLoad = (Index, TargetImg) => {
+            if (!TargetImg || TargetImg.src) return
 
-        if (AppData.SortingHandler) {
-            AppData.SortingHandler.destroy()
+            const Urls = OptimizedUrls.get(Index)
+            if (!Urls) return
+
+            TargetImg.decoding = "sync"
+            TargetImg.loading = "eager"
+            if (TargetImg.fetchPriority) TargetImg.fetchPriority = "high"
+
+            TargetImg.src = Urls.optimized
+            TargetImg.onerror = () => {
+                TargetImg.src = Urls.original
+                TargetImg.onerror = () => {
+                    TargetImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23999' fill-opacity='0.4' d='M12 2v20M2 12h20'/%3E%3C/svg%3E"
+                }
+            }
         }
 
+        const Observer = new IntersectionObserver(Entries => {
+            const Batch = []
+            Entries.forEach(Entry => {
+                if (Entry.isIntersecting) {
+                    const Img = Entry.target.querySelector("img")
+                    const Index = parseInt(Entry.target.dataset.index)
+                    Batch.push({ Img, Index })
+                    Observer.unobserve(Entry.target)
+                }
+            })
+
+            Batch.forEach(({ Img, Index }) => FastLoad(Index, Img))
+        }, {
+            rootMargin: "100px",
+            threshold: 0
+        })
+
+        const DocFrag = document.createDocumentFragment()
+
+        UpdatedGifList.forEach((Gif, Index) => {
+            const GifItem = document.createElement("div")
+            GifItem.className = "relative bg-gray-2 rounded-default h-64 w-full overflow-hidden"
+            GifItem.dataset.index = Index
+
+            const ImgContainer = document.createElement("div")
+            ImgContainer.className = "bg-transparent relative w-full h-full"
+
+            const Img = document.createElement("img")
+            Img.className = "absolute inset-0 w-full h-full object-contain"
+
+            const PosDisplay = document.createElement("div")
+            PosDisplay.className = "absolute top-2 left-2 flex items-center"
+            PosDisplay.innerHTML = `
+            <span class="text-sm font-bold text-white px-2 py-1 rounded-l bg-black bg-opacity-70">Pos</span>
+            <span class="position-value text-sm font-bold text-white px-2 py-1 rounded-r bg-black bg-opacity-70 cursor-pointer">${Gif.metadata?.e || "N/A"}</span>
+        `
+
+            const DeleteBtn = document.createElement("button")
+            DeleteBtn.className = "remove-btn absolute right-2 top-2 w-7 h-7 rounded bg-black flex items-center justify-center text-white cursor-pointer"
+            DeleteBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`
+            DeleteBtn.addEventListener("click", E => {
+                E.stopPropagation()
+                RemoveGifItem(Index)
+            })
+
+            PosDisplay.lastChild.addEventListener("click", function () {
+                const Input = document.createElement("input")
+                Input.type = "text"
+                Input.className = "text-sm font-bold text-white bg-black bg-opacity-90 px-2 py-1 rounded w-16 outline-none"
+                Input.value = Gif.metadata?.e || ""
+
+                const Complete = () => {
+                    const NewPos = parseInt(Input.value)
+                    if (!isNaN(NewPos) && NewPos > 0 && NewPos <= UpdatedGifList.length) {
+                        UpdateGifPosition(Index, NewPos)
+                    }
+                    PosDisplay.replaceChild(this, Input)
+                }
+
+                Input.addEventListener("blur", Complete)
+                Input.addEventListener("keydown", E => E.key === "Enter" && Complete())
+                PosDisplay.replaceChild(Input, this)
+                Input.focus()
+            })
+
+            ImgContainer.appendChild(Img)
+            GifItem.appendChild(ImgContainer)
+            GifItem.appendChild(PosDisplay)
+            GifItem.appendChild(DeleteBtn)
+
+            Observer.observe(GifItem)
+            DocFrag.appendChild(GifItem)
+        })
+
+        GridContainer.appendChild(DocFrag)
+        AppData.SortingHandler?.destroy()
         AppData.SortingHandler = new Sortable(GridContainer, {
             animation: 150,
             ghostClass: "sortable-ghost",
-            onEnd: function () {
-                UpdateGridOrder()
-            }
+            onEnd: () => UpdateGridOrder()
         })
 
         RefreshUndoButton()
