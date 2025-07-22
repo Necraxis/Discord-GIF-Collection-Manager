@@ -1,241 +1,289 @@
-class GifCurator {
-    constructor() {
-        this.Elements = {
-            LoginSection: document.getElementById("LoginSection"),
-            TokenLoginBtn: document.getElementById("TokenLoginBtn"),
-            LocalEditBtn: document.getElementById("LocalEditBtn"),
-
-            TokenSection: document.getElementById("TokenSection"),
-            BackToLoginBtn: document.getElementById("BackToLoginBtn"),
-            PasteTokenBtn: document.getElementById("PasteTokenBtn"),
-            TokenStatusMessage: document.getElementById("TokenStatusMessage"),
-
-            DiscordActionsSection: document.getElementById("DiscordActionsSection"),
-            BackToTokenBtn: document.getElementById("BackToTokenBtn"),
-            GetCurrentCollectionBtn: document.getElementById("GetCurrentCollectionBtn"),
-            ClearCollectionBtn: document.getElementById("ClearCollectionBtn"),
-            ReplaceCollectionBtn: document.getElementById("ReplaceCollectionBtn"),
-            CombineCollectionBtn: document.getElementById("CombineCollectionBtn"),
-
-            CollectionInputSection: document.getElementById("CollectionInputSection"),
-            CollectionInputTitle: document.getElementById("CollectionInputTitle"),
-            CollectionListContainer: document.getElementById("CollectionListContainer"),
-            PasteCollectionBtn: document.getElementById("PasteCollectionBtn"),
-            FileCollectionBtn: document.getElementById("FileCollectionBtn"),
-            FileInput: document.getElementById("FileInput"),
-            ContinueWithCollectionsBtn: document.getElementById("ContinueWithCollectionsBtn"),
-
-            LayoutSection: document.getElementById("LayoutSection"),
-            SortableContainer: document.getElementById("SortableContainer"),
-            UndoBtn: document.getElementById("UndoBtn"),
-            ProceedToExportBtn: document.getElementById("ProceedToExportBtn"),
-
-            ExportSection: document.getElementById("ExportSection"),
-            ExportPreview: document.getElementById("ExportPreview"),
-            ViewJsonBtn: document.getElementById("ViewJsonBtn"),
-            ViewBase64Btn: document.getElementById("ViewBase64Btn"),
-            CopyJsonBtn: document.getElementById("CopyJsonBtn"),
-            CopyBase64Btn: document.getElementById("CopyBase64Btn"),
-            FinalExportJsonBtn: document.getElementById("FinalExportJsonBtn"),
-            FinalExportBase64Btn: document.getElementById("FinalExportBase64Btn"),
-            BackToLayoutBtn: document.getElementById("BackToLayoutBtn"),
-            ReplaceDiscordBtn: document.createElement("button"),
-
-            BackToStartBtn: document.querySelectorAll(".BackToStartBtn"),
-            GithubLink: document.querySelector("a[href*='github']")
-        }
-
-        this.State = {
-            OriginalData: null,
-            FilteredGifs: [],
-            ActionHistory: [],
-            SortableInstance: null,
-            CollectionSortableInstance: null,
-            RemovedGifs: [],
-            DiscordToken: null,
-            Collections: [],
-            CurrentAction: null
-        }
-
-        this.Initialize()
+document.addEventListener("DOMContentLoaded", function () {
+    const AppData = {
+        AuthenticationToken: "",
+        GifItemList: [],
+        CollectedData: [],
+        PreviousActions: [],
+        OperationMode: "",
+        SortingHandler: undefined,
+        CollectionSortHandler: undefined,
+        ActiveOperations: new Set()
     }
 
-    Initialize() {
-        this.ShowLoginSection()
+    const Interface = {
+        StartScreen: document.getElementById("LoginSection"),
+        AuthScreen: document.getElementById("TokenSection"),
+        MainActionsScreen: document.getElementById("DiscordActionsSection"),
+        DataInputScreen: document.getElementById("CollectionInputSection"),
+        EditorScreen: document.getElementById("LayoutSection"),
+        OutputScreen: document.getElementById("ExportSection"),
 
-        this.Elements.TokenLoginBtn.addEventListener("click", () => this.ShowTokenSection())
-        this.Elements.LocalEditBtn.addEventListener("click", () => {
-            this.State.CurrentAction = "replace"
-            this.State.Collections = []
-            this.ShowCollectionInputSection("LOCAL EDIT")
+        StartWithTokenBtn: document.getElementById("TokenLoginBtn"),
+        StartLocalBtn: document.getElementById("LocalEditBtn"),
+        SubmitTokenBtn: document.getElementById("PasteTokenBtn"),
+        FetchCurrentBtn: document.getElementById("GetCurrentCollectionBtn"),
+        EraseAllBtn: document.getElementById("ClearCollectionBtn"),
+        OverwriteBtn: document.getElementById("ReplaceCollectionBtn"),
+        MergeBtn: document.getElementById("CombineCollectionBtn"),
+
+        InputTitle: document.getElementById("CollectionInputTitle"),
+        InputList: document.getElementById("CollectionListContainer"),
+        AddFromClipboardBtn: document.getElementById("PasteCollectionBtn"),
+        AddFromFileBtn: document.getElementById("FileCollectionBtn"),
+        FileSelector: document.getElementById("FileInput"),
+        ProceedBtn: document.getElementById("ContinueWithCollectionsBtn"),
+
+        EditingArea: document.getElementById("SortableContainer"),
+        RevertBtn: document.getElementById("UndoBtn"),
+        FinishEditingBtn: document.getElementById("ProceedToExportBtn"),
+
+        ResultDisplay: document.getElementById("ExportPreview"),
+        ShowJsonBtn: document.getElementById("ViewJsonBtn"),
+        ShowBase64Btn: document.getElementById("ViewBase64Btn"),
+        CopyJsonBtn: document.getElementById("CopyJsonBtn"),
+        CopyBase64Btn: document.getElementById("CopyBase64Btn"),
+        SaveJsonBtn: document.getElementById("FinalExportJsonBtn"),
+        SaveBase64Btn: document.getElementById("FinalExportBase64Btn"),
+        ReturnToEditBtn: document.getElementById("BackToLayoutBtn"),
+
+        ReturnHomeButtons: document.querySelectorAll(".BackToStartBtn")
+    }
+
+    function StartApplication() {
+        AttachEventListeners()
+        ShowStartScreen()
+    }
+
+    function SetButtonState(Button, IsActive) {
+        Button.disabled = IsActive
+        Button.classList.toggle("opacity-50", IsActive)
+        Button.classList.toggle("cursor-not-allowed", IsActive)
+    }
+
+    function AttachEventListeners() {
+        Interface.StartWithTokenBtn.addEventListener("click", DisplayAuthScreen)
+        Interface.StartLocalBtn.addEventListener("click", function () {
+            AppData.OperationMode = "local"
+            AppData.CollectedData = []
+            DisplayDataInputScreen("LOCAL EDITING MODE")
         })
 
-        this.Elements.BackToStartBtn.forEach(Button => {
-            Button.addEventListener("click", () => this.ShowLoginSection())
+        Interface.ReturnHomeButtons.forEach(function (Button) {
+            Button.addEventListener("click", ShowStartScreen)
         })
 
-        this.Elements.PasteTokenBtn.addEventListener("click", async () => {
+        Interface.SubmitTokenBtn.addEventListener("click", async function () {
+            if (AppData.ActiveOperations.has("SubmitToken")) return
+            AppData.ActiveOperations.add("SubmitToken")
+            SetButtonState(Interface.SubmitTokenBtn, true)
+
             try {
-                const Token = await navigator.clipboard.readText()
-                await this.VerifyToken(Token)
-            } catch (Error) {
-                this.ShowStatusMessage("Failed to read clipboard", "error", "token")
+                const ClipboardText = await navigator.clipboard.readText()
+                await ValidateAuthToken(ClipboardText)
+            } catch (ErrorInfo) {
+                DisplayNotification("Unable to read clipboard data", "error")
+            } finally {
+                AppData.ActiveOperations.delete("SubmitToken")
+                SetButtonState(Interface.SubmitTokenBtn, false)
             }
         })
 
-        this.Elements.GetCurrentCollectionBtn.addEventListener("click", () => this.GetCurrentCollection())
-        this.Elements.ClearCollectionBtn.addEventListener("click", () => this.ClearCollection())
-        this.Elements.ReplaceCollectionBtn.addEventListener("click", () => {
-            this.State.CurrentAction = "replace"
-            this.State.Collections = []
-            this.ShowCollectionInputSection("REPLACE COLLECTION")
+        Interface.FetchCurrentBtn.addEventListener("click", async function () {
+            if (AppData.ActiveOperations.has("FetchCurrent")) return
+            AppData.ActiveOperations.add("FetchCurrent")
+            SetButtonState(Interface.FetchCurrentBtn, true)
+
+            try {
+                await RetrieveCurrentGifData()
+            } finally {
+                AppData.ActiveOperations.delete("FetchCurrent")
+                SetButtonState(Interface.FetchCurrentBtn, false)
+            }
         })
-        this.Elements.CombineCollectionBtn.addEventListener("click", async () => {
-            this.State.CurrentAction = "combine"
+
+        Interface.EraseAllBtn.addEventListener("click", async function () {
+            if (AppData.ActiveOperations.has("ClearAll")) return
+            AppData.ActiveOperations.add("ClearAll")
+            SetButtonState(Interface.EraseAllBtn, true)
+
+            try {
+                await ClearAllGifs()
+            } finally {
+                AppData.ActiveOperations.delete("ClearAll")
+                SetButtonState(Interface.EraseAllBtn, false)
+            }
+        })
+
+        Interface.OverwriteBtn.addEventListener("click", function () {
+            AppData.OperationMode = "overwrite"
+            AppData.CollectedData = []
+            DisplayDataInputScreen("REPLACE CURRENT COLLECTION")
+        })
+
+        Interface.MergeBtn.addEventListener("click", async function () {
+            if (AppData.ActiveOperations.has("Merge")) return
+            AppData.ActiveOperations.add("Merge")
+            SetButtonState(Interface.MergeBtn, true)
+
             try {
                 const Response = await fetch("https://discord.com/api/v9/users/@me/settings-proto/2", {
-                    headers: { Authorization: this.State.DiscordToken }
+                    headers: { Authorization: AppData.AuthenticationToken }
                 })
-                const Data = await Response.json()
-                const CurrentCollection = window.Processor.Base64ToJson(Data.settings)
-                this.State.Collections = [{
-                    ...CurrentCollection,
-                    Locked: true
+                const ResponseData = await Response.json()
+                const ExistingData = window.Processor.Base64ToJson(ResponseData.settings)
+                AppData.CollectedData = [{
+                    ...ExistingData,
+                    IsLocked: true
                 }]
-                this.ShowCollectionInputSection("COMBINE COLLECTIONS")
-            } catch (Error) {
-                this.ShowStatusMessage("Failed to get current collection: " + Error.message, "error")
+                DisplayDataInputScreen("COMBINE WITH EXISTING")
+            } catch (ErrorInfo) {
+                DisplayNotification("Failed to retrieve existing data: " + ErrorInfo.message, "error")
+            } finally {
+                AppData.ActiveOperations.delete("Merge")
+                SetButtonState(Interface.MergeBtn, false)
             }
         })
 
-        this.Elements.PasteCollectionBtn.addEventListener("click", async () => {
+        Interface.AddFromClipboardBtn.addEventListener("click", async function () {
+            if (AppData.ActiveOperations.has("PasteCollection")) return
+            AppData.ActiveOperations.add("PasteCollection")
+            SetButtonState(Interface.AddFromClipboardBtn, true)
+
             try {
-                const Text = await navigator.clipboard.readText()
-                const Collection = this.ParseCollectionInput(Text)
-                if (Collection) this.AddCollection(Collection)
+                const ClipboardContent = await navigator.clipboard.readText()
+                const ParsedData = ParseInputData(ClipboardContent)
+                if (ParsedData) AddToCollectedData(ParsedData)
             } catch {
-                this.ShowStatusMessage("Invalid data in clipboard", "error")
+                DisplayNotification("Invalid clipboard content", "error")
+            } finally {
+                AppData.ActiveOperations.delete("PasteCollection")
+                SetButtonState(Interface.AddFromClipboardBtn, false)
             }
         })
 
-        this.Elements.FileCollectionBtn.addEventListener("click", () => this.Elements.FileInput.click())
-        this.Elements.FileInput.addEventListener("change", (Event) => this.HandleFileUpload(Event))
+        Interface.AddFromFileBtn.addEventListener("click", function () {
+            Interface.FileSelector.click()
+        })
 
-        this.Elements.ContinueWithCollectionsBtn.addEventListener("click", () => {
-            if (this.State.Collections.length === 0) {
-                this.ShowStatusMessage("Please add at least one collection", "error")
+        Interface.FileSelector.addEventListener("change", function (Event) {
+            HandleFileSelection(Event)
+        })
+
+        Interface.ProceedBtn.addEventListener("click", function () {
+            if (AppData.CollectedData.length === 0) {
+                DisplayNotification("Please add at least one collection", "error")
                 return
             }
 
-            if (this.State.CurrentAction === "replace") this.ReplaceCollection()
-            else if (this.State.CurrentAction === "combine") this.CombineCollections()
+            if (AppData.OperationMode === "overwrite" || AppData.OperationMode === "local") {
+                ProcessOverwriteOperation()
+            } else if (AppData.OperationMode === "merge") {
+                ProcessMergeOperation()
+            }
         })
 
-        this.Elements.UndoBtn.addEventListener("click", () => this.HandleUndo())
-        this.Elements.ProceedToExportBtn.addEventListener("click", () => this.ShowExportSection())
+        Interface.RevertBtn.addEventListener("click", UndoLastAction)
+        Interface.FinishEditingBtn.addEventListener("click", DisplayOutputScreen)
 
-        this.Elements.ViewJsonBtn.addEventListener("click", () => this.ShowJsonView())
-        this.Elements.ViewBase64Btn.addEventListener("click", () => this.ShowBase64View())
-        this.Elements.CopyJsonBtn.addEventListener("click", () => this.CopyJson())
-        this.Elements.CopyBase64Btn.addEventListener("click", () => this.CopyBase64())
-        this.Elements.FinalExportJsonBtn.addEventListener("click", () => this.ExportJson())
-        this.Elements.FinalExportBase64Btn.addEventListener("click", () => this.ExportBase64())
-        this.Elements.BackToLayoutBtn.addEventListener("click", () => this.ShowLayoutSection())
+        Interface.ShowJsonBtn.addEventListener("click", ShowJsonPreview)
+        Interface.ShowBase64Btn.addEventListener("click", ShowBase64Preview)
+        Interface.CopyJsonBtn.addEventListener("click", CopyJsonToClipboard)
+        Interface.CopyBase64Btn.addEventListener("click", CopyBase64ToClipboard)
+        Interface.SaveJsonBtn.addEventListener("click", DownloadJsonFile)
+        Interface.SaveBase64Btn.addEventListener("click", DownloadBase64File)
+        Interface.ReturnToEditBtn.addEventListener("click", DisplayEditorScreen)
     }
 
-    ParseCollectionInput(Text) {
+    function ParseInputData(InputText) {
         try {
-            return Text.startsWith("{") ? JSON.parse(Text) : window.Processor.Base64ToJson(Text)
+            return InputText.startsWith("{") ? JSON.parse(InputText) : window.Processor.Base64ToJson(InputText)
         } catch {
             return null
         }
     }
 
-    ShowLoginSection() {
-        this.HideAllSections()
-        this.Elements.LoginSection.classList.remove("hidden")
-        this.ResetState()
+    function ShowStartScreen() {
+        HideAllScreens()
+        Interface.StartScreen.classList.remove("hidden")
+        ResetApplicationData()
     }
 
-    ShowTokenSection() {
-        this.HideAllSections()
-        this.Elements.TokenSection.classList.remove("hidden")
+    function DisplayAuthScreen() {
+        HideAllScreens()
+        Interface.AuthScreen.classList.remove("hidden")
     }
 
-    ShowDiscordActionsSection() {
-        this.HideAllSections()
-        this.Elements.DiscordActionsSection.classList.remove("hidden")
+    function DisplayMainActionsScreen() {
+        HideAllScreens()
+        Interface.MainActionsScreen.classList.remove("hidden")
     }
 
-    ShowCollectionInputSection(Title) {
-        this.HideAllSections()
-        this.Elements.CollectionInputSection.classList.remove("hidden")
-        this.Elements.CollectionInputTitle.textContent = Title
-        if (this.State.CollectionSortableInstance) {
-            this.State.CollectionSortableInstance.destroy()
-            this.State.CollectionSortableInstance = null
+    function DisplayDataInputScreen(TitleText) {
+        HideAllScreens()
+        Interface.DataInputScreen.classList.remove("hidden")
+        Interface.InputTitle.textContent = TitleText
+        if (AppData.CollectionSortHandler) {
+            AppData.CollectionSortHandler.destroy()
+            AppData.CollectionSortHandler = undefined
         }
-        this.RenderCollectionList()
+        RenderCollectionList()
     }
 
-    ShowLayoutSection() {
-        this.HideAllSections()
-        this.Elements.LayoutSection.classList.remove("hidden")
-        this.RenderGifGrid()
+    function DisplayEditorScreen() {
+        HideAllScreens()
+        Interface.EditorScreen.classList.remove("hidden")
+        RenderGifEditingGrid()
     }
 
-    ShowExportSection() {
-        this.HideAllSections()
-        this.Elements.ExportSection.classList.remove("hidden")
-        this.ShowJsonView()
+    function DisplayOutputScreen() {
+        HideAllScreens()
+        Interface.OutputScreen.classList.remove("hidden")
+        ShowJsonPreview()
 
-        if (this.State.DiscordToken) {
-            this.Elements.ReplaceDiscordBtn.className = "w-full h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg"
-            this.Elements.ReplaceDiscordBtn.textContent = "REPLACE DISCORD COLLECTION AUTOMATICALLY"
-            this.Elements.ReplaceDiscordBtn.addEventListener("click", () => this.ReplaceDiscordCollection())
+        if (AppData.AuthenticationToken) {
+            const AutoUpdateBtn = document.createElement("button")
+            AutoUpdateBtn.className = "w-full h-12 rounded-default bg-gray-2 hover:bg-gray-3 font-bold text-lg"
+            AutoUpdateBtn.textContent = "UPDATE DISCORD COLLECTION AUTOMATICALLY"
+            AutoUpdateBtn.addEventListener("click", UpdateDiscordCollection)
 
-            const ExportButtonsContainer = this.Elements.ExportSection.querySelector(".flex.flex-col")
-            if (ExportButtonsContainer) {
-                const BackButton = ExportButtonsContainer.querySelector("#BackToLayoutBtn")
-                if (BackButton) {
-                    ExportButtonsContainer.insertBefore(this.Elements.ReplaceDiscordBtn, BackButton)
+            const ButtonContainer = Interface.OutputScreen.querySelector(".flex.flex-col")
+            if (ButtonContainer) {
+                const BackBtn = ButtonContainer.querySelector("#BackToLayoutBtn")
+                if (BackBtn) {
+                    ButtonContainer.insertBefore(AutoUpdateBtn, BackBtn)
                 } else {
-                    ExportButtonsContainer.appendChild(this.Elements.ReplaceDiscordBtn)
+                    ButtonContainer.appendChild(AutoUpdateBtn)
                 }
             }
         }
     }
 
-    HideAllSections() {
-        document.querySelectorAll("section").forEach(Section => {
-            Section.classList.add("hidden")
+    function HideAllScreens() {
+        document.querySelectorAll("section").forEach(function (Screen) {
+            Screen.classList.add("hidden")
         })
     }
 
-    ResetState() {
-        if (this.State.CollectionSortableInstance) {
-            this.State.CollectionSortableInstance.destroy()
+    function ResetApplicationData() {
+        if (AppData.CollectionSortHandler) {
+            AppData.CollectionSortHandler.destroy()
         }
-        this.State = {
-            OriginalData: null,
-            FilteredGifs: [],
-            ActionHistory: [],
-            SortableInstance: null,
-            CollectionSortableInstance: null,
-            RemovedGifs: [],
-            DiscordToken: null,
-            Collections: [],
-            CurrentAction: null
-        }
+        AppData.AuthenticationToken = ""
+        AppData.GifItemList = []
+        AppData.CollectedData = []
+        AppData.PreviousActions = []
+        AppData.OperationMode = ""
+        AppData.SortingHandler = undefined
+        AppData.CollectionSortHandler = undefined
     }
 
-    RenderCollectionList() {
-        this.Elements.CollectionListContainer.innerHTML = ""
-        if (this.State.Collections.length === 0) {
-            const Message = this.State.CurrentAction === "combine"
+    function RenderCollectionList() {
+        Interface.InputList.innerHTML = ""
+        if (AppData.CollectedData.length === 0) {
+            const Message = AppData.OperationMode === "merge"
                 ? "Add collections to combine with your current one"
                 : "No collections added yet"
-            this.Elements.CollectionListContainer.innerHTML = `
+            Interface.InputList.innerHTML = `
                 <div class="bg-gray-2 rounded-default p-4 flex items-center justify-center h-40">
                     <p class="text-text-muted">${Message}</p>
                 </div>
@@ -243,23 +291,23 @@ class GifCurator {
             return
         }
 
-        const SortableContainer = document.createElement("div")
-        SortableContainer.id = "SortableCollectionsContainer"
-        this.Elements.CollectionListContainer.appendChild(SortableContainer)
+        const ListContainer = document.createElement("div")
+        ListContainer.id = "CollectionSortContainer"
+        Interface.InputList.appendChild(ListContainer)
 
-        this.State.Collections.forEach((Collection, Index) => {
+        AppData.CollectedData.forEach(function (Collection, Index) {
             const GifCount = Collection.gifs?.favorites?.length || 0
-            const IsLocked = Collection.Locked || false
-            const Item = document.createElement("div")
-            Item.className = `bg-gray-2 rounded-default p-4 mb-4 collection-item ${IsLocked ? "locked border-l-4 border-blue-500" : ""}`
-            Item.dataset.index = Index
-            Item.innerHTML = `
+            const IsProtected = Collection.IsLocked || false
+            const ListItem = document.createElement("div")
+            ListItem.className = `bg-gray-2 rounded-default p-4 mb-4 collection-item ${IsProtected ? "locked border-l-4 border-blue-500" : ""}`
+            ListItem.dataset.index = Index
+            ListItem.innerHTML = `
                 <div class="flex justify-between items-center">
                     <div>
-                        <h3 class="font-bold">${IsLocked ? "YOUR CURRENT COLLECTION" : `Collection ${Index}`}</h3>
+                        <h3 class="font-bold">${IsProtected ? "YOUR CURRENT COLLECTION" : `Collection ${Index}`}</h3>
                         <p class="text-sm text-text-muted">${GifCount} GIFs</p>
                     </div>
-                    ${IsLocked ? "" : `
+                    ${IsProtected ? "" : `
                     <button class="remove-collection-btn w-8 h-8 rounded bg-gray-3 hover:bg-gray-4 flex items-center justify-center">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -269,432 +317,429 @@ class GifCurator {
                 </div>
             `
 
-            if (!IsLocked) {
-                Item.querySelector(".remove-collection-btn").addEventListener("click", (E) => {
-                    E.stopPropagation()
-                    this.State.Collections.splice(Index, 1)
-                    this.RenderCollectionList()
+            if (!IsProtected) {
+                ListItem.querySelector(".remove-collection-btn").addEventListener("click", function (Event) {
+                    Event.stopPropagation()
+                    AppData.CollectedData.splice(Index, 1)
+                    RenderCollectionList()
                 })
             }
 
-            SortableContainer.appendChild(Item)
+            ListContainer.appendChild(ListItem)
         })
 
-        if (this.State.CollectionSortableInstance) {
-            this.State.CollectionSortableInstance.destroy()
+        if (AppData.CollectionSortHandler) {
+            AppData.CollectionSortHandler.destroy()
         }
 
-        this.State.CollectionSortableInstance = new Sortable(SortableContainer, {
+        AppData.CollectionSortHandler = new Sortable(ListContainer, {
             animation: 150,
             ghostClass: "sortable-ghost",
             draggable: ".collection-item",
-            onEnd: (evt) => {
-                if (evt.oldIndex !== evt.newIndex) {
-                    const Items = Array.from(SortableContainer.children)
-                    const NewCollections = Items.map(item =>
-                        this.State.Collections[parseInt(item.dataset.index)]
-                    )
-                    this.State.Collections = NewCollections
-                    Items.forEach((item, index) => {
-                        item.dataset.index = index
+            onEnd: function (Event) {
+                if (Event.oldIndex !== Event.newIndex) {
+                    const Items = Array.from(ListContainer.children)
+                    const ReorderedCollections = Items.map(function (Item) {
+                        return AppData.CollectedData[parseInt(Item.dataset.index)]
+                    })
+                    AppData.CollectedData = ReorderedCollections
+                    Items.forEach(function (Item, Index) {
+                        Item.dataset.index = Index
                     })
                 }
             }
         })
     }
 
-    AddCollection(Collection) {
-        if (Collection?.gifs?.favorites?.length > 0) {
-            if (Collection.Locked) return
-            const SortedGifs = [...Collection.gifs.favorites].sort((A, B) => (A.metadata?.e || 0) - (B.metadata?.e || 0))
-            SortedGifs.forEach((Gif, Index) => {
+    function AddToCollectedData(CollectionData) {
+        if (CollectionData?.gifs?.favorites?.length > 0) {
+            if (CollectionData.IsLocked) return
+            const SortedGifList = [...CollectionData.gifs.favorites].sort(function (A, B) {
+                return (A.metadata?.e || 0) - (B.metadata?.e || 0)
+            })
+            SortedGifList.forEach(function (Gif, Index) {
                 if (!Gif.metadata) Gif.metadata = {}
                 Gif.metadata.e = Index + 1
             })
 
-            if (this.State.CurrentAction === "combine" && this.State.Collections.length > 0 && this.State.Collections[0].Locked) {
-                this.State.Collections.push({
-                    metadata: { versionQ: 1, timesFavoritedQ: SortedGifs.length },
-                    gifs: { favorites: SortedGifs, xQ: 0 },
-                })
-            } else {
-                this.State.Collections.push({
-                    metadata: { versionQ: 1, timesFavoritedQ: SortedGifs.length },
-                    gifs: { favorites: SortedGifs, xQ: 0 },
-                })
-            }
-            this.RenderCollectionList()
+            AppData.CollectedData.push({
+                metadata: { versionQ: 1, timesFavoritedQ: SortedGifList.length },
+                gifs: { favorites: SortedGifList, xQ: 0 },
+            })
+            RenderCollectionList()
         } else {
-            this.ShowStatusMessage("No GIFs found in collection", "error")
+            DisplayNotification("No GIFs found in collection", "error")
         }
     }
 
-    async VerifyToken(Token) {
+    async function ValidateAuthToken(Token) {
         try {
             const Response = await fetch("https://discord.com/api/v9/users/@me", {
                 headers: { Authorization: Token }
             })
             if (!Response.ok) throw new Error("Invalid token")
-            this.State.DiscordToken = Token
-            this.ShowDiscordActionsSection()
-            this.ShowStatusMessage("Token verified successfully!", "success", "token")
-        } catch (Error) {
-            this.ShowStatusMessage("Invalid token: " + Error.message, "error", "token")
+            AppData.AuthenticationToken = Token
+            DisplayMainActionsScreen()
+            DisplayNotification("Token verified successfully!", "success")
+        } catch (ErrorInfo) {
+            DisplayNotification("Invalid token: " + ErrorInfo.message, "error")
         }
     }
 
-    async GetCurrentCollection() {
+    async function RetrieveCurrentGifData() {
         try {
             const Response = await fetch("https://discord.com/api/v9/users/@me/settings-proto/2", {
-                headers: { Authorization: this.State.DiscordToken }
+                headers: { Authorization: AppData.AuthenticationToken }
             })
-            const Data = await Response.json()
-            const Collection = window.Processor.Base64ToJson(Data.settings)
-            this.ProcessJsonData(Collection)
-        } catch (Error) {
-            this.ShowStatusMessage("Failed to get collection: " + Error.message, "error")
+            const ResponseData = await Response.json()
+            const GifData = window.Processor.Base64ToJson(ResponseData.settings)
+            ProcessGifData(GifData)
+        } catch (ErrorInfo) {
+            DisplayNotification("Failed to get collection: " + ErrorInfo.message, "error")
         }
     }
 
-    async ClearCollection() {
+    async function ClearAllGifs() {
         try {
-            const EmptyCollection = {
+            const EmptyGifData = {
                 metadata: { versionQ: 1, timesFavoritedQ: 0 },
                 gifs: { favorites: [], xQ: 0 },
                 emoji: { x: [] },
                 xQ: { x: [] }
             }
-            const BinaryData = window.Processor.JsonToBase64(EmptyCollection)
-            const Base64String = typeof BinaryData === "string" && BinaryData.includes(",")
-                ? this.ConvertByteStringToBase64(BinaryData)
-                : BinaryData
+            const EncodedData = window.Processor.JsonToBase64(EmptyGifData)
+            const Base64Result = typeof EncodedData === "string" && EncodedData.includes(",")
+                ? ConvertBytesToBase64(EncodedData)
+                : EncodedData
 
-            await this.UpdateDiscordCollection(Base64String)
-            this.ShowStatusMessage("Collection cleared successfully!", "success")
-        } catch (Error) {
-            this.ShowStatusMessage("Failed to clear collection: " + Error.message, "error")
+            await SendToDiscord(Base64Result)
+            DisplayNotification("Collection cleared successfully!", "success")
+        } catch (ErrorInfo) {
+            DisplayNotification("Failed to clear collection: " + ErrorInfo.message, "error")
         }
     }
 
-    async ReplaceCollection() {
+    function ProcessOverwriteOperation() {
         try {
-            if (this.State.Collections.length === 0) {
+            if (AppData.CollectedData.length === 0) {
                 throw new Error("Please add at least one collection")
             }
 
-            let CombinedGifs = []
-            let CurrentPosition = 1
+            let CombinedGifList = []
+            let PositionCounter = 1
 
-            const CollectionsCopy = [...this.State.Collections].reverse()
-            CollectionsCopy.forEach(Collection => {
-                const SortedGifs = [...Collection.gifs.favorites].sort(
-                    (A, B) => (A.metadata?.e || 0) - (B.metadata?.e || 0)
-                )
+            const ReversedCollections = [...AppData.CollectedData].reverse()
+            ReversedCollections.forEach(function (Collection) {
+                const OrderedGifs = [...Collection.gifs.favorites].sort(function (A, B) {
+                    return (A.metadata?.e || 0) - (B.metadata?.e || 0)
+                })
 
-                SortedGifs.forEach(Gif => {
+                OrderedGifs.forEach(function (Gif) {
                     if (!Gif.metadata) Gif.metadata = {}
-                    Gif.metadata.e = CurrentPosition++
-                    CombinedGifs.push(Gif)
+                    Gif.metadata.e = PositionCounter++
+                    CombinedGifList.push(Gif)
                 })
             })
 
-            const UpdatedCollection = {
-                metadata: { versionQ: 1, timesFavoritedQ: CombinedGifs.length },
-                gifs: { favorites: CombinedGifs, xQ: 0 },
+            const FinalData = {
+                metadata: { versionQ: 1, timesFavoritedQ: CombinedGifList.length },
+                gifs: { favorites: CombinedGifList, xQ: 0 },
             }
 
-            this.State.OriginalData = UpdatedCollection
-            this.State.FilteredGifs = [...CombinedGifs]
-            this.ShowLayoutSection()
-        } catch (Error) {
-            this.ShowStatusMessage("Failed to replace collection: " + Error.message, "error")
+            AppData.GifItemList = [...CombinedGifList]
+            DisplayEditorScreen()
+        } catch (ErrorInfo) {
+            DisplayNotification("Failed to process collections: " + ErrorInfo.message, "error")
         }
     }
 
-    CombineCollections() {
+    function ProcessMergeOperation() {
         try {
-            if (this.State.Collections.length < 2) {
+            if (AppData.CollectedData.length < 2) {
                 throw new Error("Please add at least one additional collection")
             }
 
-            let CombinedGifs = []
-            let CurrentPosition = 1
+            let MergedGifList = []
+            let PositionCounter = 1
 
-            const CollectionsCopy = [...this.State.Collections].reverse()
-            CollectionsCopy.forEach(Collection => {
-                const SortedGifs = [...Collection.gifs.favorites].sort(
-                    (A, B) => (A.metadata?.e || 0) - (B.metadata?.e || 0)
-                )
+            const ReversedCollections = [...AppData.CollectedData].reverse()
+            ReversedCollections.forEach(function (Collection) {
+                const OrderedGifs = [...Collection.gifs.favorites].sort(function (A, B) {
+                    return (A.metadata?.e || 0) - (B.metadata?.e || 0)
+                })
 
-                SortedGifs.forEach(Gif => {
+                OrderedGifs.forEach(function (Gif) {
                     if (!Gif.metadata) Gif.metadata = {}
-                    Gif.metadata.e = CurrentPosition++
-                    CombinedGifs.push(Gif)
+                    Gif.metadata.e = PositionCounter++
+                    MergedGifList.push(Gif)
                 })
             })
 
-            const UpdatedCollection = {
-                metadata: { versionQ: 1, timesFavoritedQ: CombinedGifs.length },
-                gifs: { favorites: CombinedGifs, xQ: 0 },
-            }
-
-            this.State.OriginalData = UpdatedCollection
-            this.State.FilteredGifs = [...CombinedGifs]
-            this.ShowLayoutSection()
-        } catch (Error) {
-            this.ShowStatusMessage("Failed to combine collections: " + Error.message, "error")
+            AppData.GifItemList = [...MergedGifList]
+            DisplayEditorScreen()
+        } catch (ErrorInfo) {
+            DisplayNotification("Failed to merge collections: " + ErrorInfo.message, "error")
         }
     }
 
-    async ReplaceDiscordCollection() {
+    async function UpdateDiscordCollection() {
         try {
-            const ExportData = this.GetExportData()
-            const BinaryData = window.Processor.JsonToBase64(ExportData)
-            const Base64String = typeof BinaryData === "string" && BinaryData.includes(",")
-                ? this.ConvertByteStringToBase64(BinaryData)
-                : BinaryData
+            const ExportData = GenerateExportData()
+            const EncodedData = window.Processor.JsonToBase64(ExportData)
+            const Base64Result = typeof EncodedData === "string" && EncodedData.includes(",")
+                ? ConvertBytesToBase64(EncodedData)
+                : EncodedData
 
-            await this.UpdateDiscordCollection(Base64String)
-            this.ShowStatusMessage("Discord collection updated successfully!", "success")
-        } catch (Error) {
-            this.ShowStatusMessage("Failed to update Discord collection: " + Error.message, "error")
+            await SendToDiscord(Base64Result)
+            DisplayNotification("Discord collection updated successfully!", "success")
+        } catch (ErrorInfo) {
+            DisplayNotification("Failed to update Discord collection: " + ErrorInfo.message, "error")
         }
     }
 
-    async UpdateDiscordCollection(Base64Data) {
+    async function SendToDiscord(EncodedData) {
         const Response = await fetch("https://discord.com/api/v9/users/@me/settings-proto/2", {
             method: "PATCH",
             headers: {
-                "Authorization": this.State.DiscordToken,
+                "Authorization": AppData.AuthenticationToken,
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ settings: Base64Data })
+            body: JSON.stringify({ settings: EncodedData })
         })
 
         if (!Response.ok) throw new Error("Failed to update collection")
     }
 
-    HandleFileUpload(Event) {
-        const File = Event.target.files[0]
-        if (!File) return
-        const Reader = new FileReader()
-        Reader.onload = (E) => {
+    function HandleFileSelection(Event) {
+        const SelectedFile = Event.target.files[0]
+        if (!SelectedFile) return
+        const FileReader = new FileReader()
+        FileReader.onload = function (Event) {
             try {
-                const Text = E.target.result
-                const Collection = this.ParseCollectionInput(Text)
-                if (Collection) {
-                    if (this.Elements.CollectionInputSection.classList.contains("hidden")) {
-                        this.ProcessJsonData(Collection)
+                const FileContent = Event.target.result
+                const ParsedData = ParseInputData(FileContent)
+                if (ParsedData) {
+                    if (Interface.DataInputScreen.classList.contains("hidden")) {
+                        ProcessGifData(ParsedData)
                     } else {
-                        this.AddCollection(Collection)
+                        AddToCollectedData(ParsedData)
                     }
                 }
             } catch {
-                this.ShowStatusMessage("Invalid file content", "error")
+                DisplayNotification("Invalid file content", "error")
             }
         }
-        if (File.name.endsWith(".json")) Reader.readAsText(File)
-        else Reader.readAsDataURL(File)
-    }
-
-    ProcessJsonData(JsonData) {
-        if (JsonData.gifs?.favorites?.length > 0) {
-            this.State.OriginalData = JsonData
-            this.State.FilteredGifs = JsonData.gifs.favorites
-            this.State.ActionHistory = []
-            this.State.SortableInstance = null
-            this.State.RemovedGifs = []
-            this.ShowLayoutSection()
+        if (SelectedFile.name.endsWith(".json")) {
+            FileReader.readAsText(SelectedFile)
         } else {
-            this.ShowStatusMessage("No GIFs found in data", "error")
+            FileReader.readAsDataURL(SelectedFile)
         }
     }
 
-    RenderGifGrid() {
+    function ProcessGifData(GifData) {
+        if (GifData.gifs?.favorites?.length > 0) {
+            AppData.GifItemList = GifData.gifs.favorites
+            AppData.PreviousActions = []
+            AppData.SortingHandler = undefined
+            DisplayEditorScreen()
+        } else {
+            DisplayNotification("No GIFs found in data", "error")
+        }
+    }
+
+    function RenderGifEditingGrid() {
         const GridContainer = document.createElement("div")
         GridContainer.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 w-full"
-        GridContainer.id = "GifGridContainer"
-        this.Elements.SortableContainer.innerHTML = ""
-        this.Elements.SortableContainer.appendChild(GridContainer)
+        GridContainer.id = "GifEditGrid"
+        Interface.EditingArea.innerHTML = ""
+        Interface.EditingArea.appendChild(GridContainer)
 
-        const SortedGifs = [...this.State.FilteredGifs].sort((A, B) => (B.metadata?.e || 0) - (A.metadata?.e || 0))
-        const UpdatedGifs = SortedGifs.map((Gif, Index) => ({
-            url: Gif.url,
-            metadata: {
-                format: Gif.metadata.format,
-                src: Gif.metadata.src,
-                width: Gif.metadata.width,
-                height: Gif.metadata.height,
-                e: SortedGifs.length - Index
+        const SortedByPosition = [...AppData.GifItemList].sort(function (A, B) {
+            return (B.metadata?.e || 0) - (A.metadata?.e || 0)
+        })
+        const UpdatedGifList = SortedByPosition.map(function (Gif, Index) {
+            return {
+                url: Gif.url,
+                metadata: {
+                    format: Gif.metadata.format,
+                    src: Gif.metadata.src,
+                    width: Gif.metadata.width,
+                    height: Gif.metadata.height,
+                    e: SortedByPosition.length - Index
+                }
             }
-        }))
-        this.State.FilteredGifs = UpdatedGifs
+        })
+        AppData.GifItemList = UpdatedGifList
 
-        const Fragment = document.createDocumentFragment()
-        UpdatedGifs.forEach((Gif, DisplayIndex) => {
-            const GifUrl = Gif.metadata?.src || Gif.url
-            const Item = document.createElement("div")
-            Item.className = "relative bg-gray-2 rounded-default h-64 w-full overflow-hidden"
-            Item.dataset.index = DisplayIndex
+        const DocumentFragment = document.createDocumentFragment()
+        UpdatedGifList.forEach(function (Gif, DisplayIndex) {
+            const ImageUrl = Gif.metadata?.src || Gif.url
+            const GifItem = document.createElement("div")
+            GifItem.className = "relative bg-gray-2 rounded-default h-64 w-full overflow-hidden"
+            GifItem.dataset.index = DisplayIndex
 
-            const ImgContainer = document.createElement("div")
-            ImgContainer.className = "bg-transparent relative w-full h-full"
+            const ImageContainer = document.createElement("div")
+            ImageContainer.className = "bg-transparent relative w-full h-full"
 
-            const Img = document.createElement("img")
-            Img.className = "absolute inset-0 w-full h-full object-contain"
-            Img.loading = "lazy"
-            Img.decoding = "async"
-            Img.src = GifUrl
+            const Image = document.createElement("img")
+            Image.className = "absolute inset-0 w-full h-full object-contain"
+            Image.loading = "lazy"
+            Image.decoding = "async"
+            Image.src = ImageUrl
 
-            const PositionContainer = document.createElement("div")
-            PositionContainer.className = "absolute top-2 left-2 flex items-center"
+            const PositionDisplay = document.createElement("div")
+            PositionDisplay.className = "absolute top-2 left-2 flex items-center"
 
-            const PosLabel = document.createElement("span")
-            PosLabel.className = "text-sm font-bold text-white px-2 py-1 rounded-l bg-black bg-opacity-70"
-            PosLabel.textContent = "Pos"
+            const PositionLabel = document.createElement("span")
+            PositionLabel.className = "text-sm font-bold text-white px-2 py-1 rounded-l bg-black bg-opacity-70"
+            PositionLabel.textContent = "Pos"
 
-            const PositionValue = document.createElement("span")
-            PositionValue.className = "position-value text-sm font-bold text-white px-2 py-1 rounded-r bg-black bg-opacity-70 cursor-pointer"
-            PositionValue.textContent = Gif.metadata?.e || "N/A"
+            const PositionNumber = document.createElement("span")
+            PositionNumber.className = "position-value text-sm font-bold text-white px-2 py-1 rounded-r bg-black bg-opacity-70 cursor-pointer"
+            PositionNumber.textContent = Gif.metadata?.e || "N/A"
 
-            const RemoveBtn = document.createElement("button")
-            RemoveBtn.className = "remove-btn absolute right-2 top-2 w-7 h-7 rounded bg-black flex items-center justify-center text-white cursor-pointer"
-            RemoveBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`
-            RemoveBtn.addEventListener("click", (E) => {
-                E.stopPropagation()
-                this.RemoveGif(DisplayIndex)
+            const DeleteButton = document.createElement("button")
+            DeleteButton.className = "remove-btn absolute right-2 top-2 w-7 h-7 rounded bg-black flex items-center justify-center text-white cursor-pointer"
+            DeleteButton.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`
+            DeleteButton.addEventListener("click", function (Event) {
+                Event.stopPropagation()
+                RemoveGifItem(DisplayIndex)
             })
 
-            PositionValue.addEventListener("click", () => {
-                const Input = document.createElement("input")
-                Input.type = "text"
-                Input.className = "text-sm font-bold text-white bg-black bg-opacity-90 px-2 py-1 rounded w-16 outline-none"
-                Input.value = Gif.metadata?.e || ""
+            PositionNumber.addEventListener("click", function () {
+                const InputField = document.createElement("input")
+                InputField.type = "text"
+                InputField.className = "text-sm font-bold text-white bg-black bg-opacity-90 px-2 py-1 rounded w-16 outline-none"
+                InputField.value = Gif.metadata?.e || ""
 
-                PositionContainer.replaceChild(Input, PositionValue)
-                Input.focus()
-                Input.select()
+                PositionDisplay.replaceChild(InputField, PositionNumber)
+                InputField.focus()
+                InputField.select()
 
-                const HandleBlur = () => {
-                    const NewPos = parseInt(Input.value)
-                    const CurrentPos = Gif.metadata?.e || 1
-                    const MaxPos = this.State.FilteredGifs.length
+                const HandleInputComplete = function () {
+                    const NewPosition = parseInt(InputField.value)
+                    const CurrentPosition = Gif.metadata?.e || 1
+                    const MaxPosition = AppData.GifItemList.length
 
-                    if (!isNaN(NewPos) && NewPos >= 1 && NewPos <= MaxPos && NewPos !== CurrentPos) {
-                        this.UpdateGifPosition(DisplayIndex, NewPos)
+                    if (!isNaN(NewPosition) && NewPosition >= 1 && NewPosition <= MaxPosition && NewPosition !== CurrentPosition) {
+                        UpdateGifPosition(DisplayIndex, NewPosition)
                     }
 
-                    PositionContainer.replaceChild(PositionValue, Input)
-                    Input.removeEventListener("blur", HandleBlur)
-                    Input.removeEventListener("keydown", HandleKeyDown)
+                    PositionDisplay.replaceChild(PositionNumber, InputField)
+                    InputField.removeEventListener("blur", HandleInputComplete)
+                    InputField.removeEventListener("keydown", HandleInputKeyPress)
                 }
 
-                const HandleKeyDown = (E) => {
-                    if (E.key === "Enter") HandleBlur()
+                const HandleInputKeyPress = function (Event) {
+                    if (Event.key === "Enter") HandleInputComplete()
                 }
 
-                Input.addEventListener("blur", HandleBlur)
-                Input.addEventListener("keydown", HandleKeyDown)
+                InputField.addEventListener("blur", HandleInputComplete)
+                InputField.addEventListener("keydown", HandleInputKeyPress)
             })
 
-            PositionContainer.appendChild(PosLabel)
-            PositionContainer.appendChild(PositionValue)
-            ImgContainer.appendChild(Img)
-            Item.appendChild(ImgContainer)
-            Item.appendChild(PositionContainer)
-            Item.appendChild(RemoveBtn)
-            Fragment.appendChild(Item)
+            PositionDisplay.appendChild(PositionLabel)
+            PositionDisplay.appendChild(PositionNumber)
+            ImageContainer.appendChild(Image)
+            GifItem.appendChild(ImageContainer)
+            GifItem.appendChild(PositionDisplay)
+            GifItem.appendChild(DeleteButton)
+            DocumentFragment.appendChild(GifItem)
         })
 
-        GridContainer.appendChild(Fragment)
+        GridContainer.appendChild(DocumentFragment)
 
-        if (this.State.SortableInstance) {
-            this.State.SortableInstance.destroy()
+        if (AppData.SortingHandler) {
+            AppData.SortingHandler.destroy()
         }
 
-        this.State.SortableInstance = new Sortable(GridContainer, {
+        AppData.SortingHandler = new Sortable(GridContainer, {
             animation: 150,
             ghostClass: "sortable-ghost",
-            onEnd: () => this.UpdateLayoutOrder()
+            onEnd: function () {
+                UpdateGridOrder()
+            }
         })
 
-        this.UpdateUndoButton()
+        RefreshUndoButton()
     }
 
-    UpdateGifPosition(CurrentIndex, NewPosition) {
-        const BeforeState = JSON.parse(JSON.stringify(this.State.FilteredGifs))
-        const UpdatedGifs = [...this.State.FilteredGifs]
-        const TotalGifs = UpdatedGifs.length
-        NewPosition = Math.max(1, Math.min(NewPosition, TotalGifs))
+    function UpdateGifPosition(CurrentIndex, NewPosition) {
+        const PreviousState = JSON.parse(JSON.stringify(AppData.GifItemList))
+        const ModifiedGifs = [...AppData.GifItemList]
+        const TotalItems = ModifiedGifs.length
+        NewPosition = Math.max(1, Math.min(NewPosition, TotalItems))
 
-        const GifToMove = UpdatedGifs[CurrentIndex]
-        if (!GifToMove) return
+        const TargetGif = ModifiedGifs[CurrentIndex]
+        if (!TargetGif) return
 
-        if (!GifToMove.metadata) GifToMove.metadata = {}
+        if (!TargetGif.metadata) TargetGif.metadata = {}
 
-        const CurrentPos = GifToMove.metadata.e || (TotalGifs - CurrentIndex)
-        if (CurrentPos === NewPosition) return
+        const OldPosition = TargetGif.metadata.e || (TotalItems - CurrentIndex)
+        if (OldPosition === NewPosition) return
 
-        UpdatedGifs.forEach(gif => {
-            if (!gif.metadata) gif.metadata = {}
+        ModifiedGifs.forEach(function (Gif) {
+            if (!Gif.metadata) Gif.metadata = {}
 
-            if (CurrentPos < NewPosition) {
-                if (gif.metadata.e > CurrentPos && gif.metadata.e <= NewPosition) {
-                    gif.metadata.e -= 1
+            if (OldPosition < NewPosition) {
+                if (Gif.metadata.e > OldPosition && Gif.metadata.e <= NewPosition) {
+                    Gif.metadata.e -= 1
                 }
             } else {
-                if (gif.metadata.e < CurrentPos && gif.metadata.e >= NewPosition) {
-                    gif.metadata.e += 1
+                if (Gif.metadata.e < OldPosition && Gif.metadata.e >= NewPosition) {
+                    Gif.metadata.e += 1
                 }
             }
         })
 
-        GifToMove.metadata.e = NewPosition
-        this.State.FilteredGifs = UpdatedGifs.sort((a, b) => (a.metadata.e || 0) - (b.metadata.e || 0))
-
-        this.State.ActionHistory.push({
-            Action: "reposition",
-            BeforeState: BeforeState,
+        TargetGif.metadata.e = NewPosition
+        AppData.GifItemList = ModifiedGifs.sort(function (A, B) {
+            return (A.metadata.e || 0) - (B.metadata.e || 0)
         })
 
-        this.RenderGifGrid()
-        this.UpdateUndoButton()
-    }
-
-    RemoveGif(Index) {
-        this.State.ActionHistory.push({
-            Action: "remove",
-            BeforeState: [...this.State.FilteredGifs]
+        AppData.PreviousActions.push({
+            ActionType: "position_change",
+            PreviousState: PreviousState,
         })
-        this.State.FilteredGifs.splice(Index, 1)
-        this.RenderGifGrid()
+
+        RenderGifEditingGrid()
+        RefreshUndoButton()
     }
 
-    HandleUndo() {
-        if (this.State.ActionHistory.length === 0) return
-
-        const LastAction = this.State.ActionHistory.pop()
-        this.State.FilteredGifs = JSON.parse(JSON.stringify(LastAction.BeforeState))
-
-        this.RenderGifGrid()
-        this.UpdateUndoButton()
+    function RemoveGifItem(Index) {
+        AppData.PreviousActions.push({
+            ActionType: "remove_item",
+            PreviousState: [...AppData.GifItemList]
+        })
+        AppData.GifItemList.splice(Index, 1)
+        RenderGifEditingGrid()
     }
 
-    UpdateUndoButton() {
-        const HasHistory = this.State.ActionHistory.length > 0
-        this.Elements.UndoBtn.classList.toggle("hidden", !HasHistory)
+    function UndoLastAction() {
+        if (AppData.PreviousActions.length === 0) return
+
+        const LastAction = AppData.PreviousActions.pop()
+        AppData.GifItemList = JSON.parse(JSON.stringify(LastAction.PreviousState))
+
+        RenderGifEditingGrid()
+        RefreshUndoButton()
     }
 
-    UpdateLayoutOrder() {
-        const GridContainer = document.getElementById("GifGridContainer")
+    function RefreshUndoButton() {
+        const HasHistory = AppData.PreviousActions.length > 0
+        Interface.RevertBtn.classList.toggle("hidden", !HasHistory)
+    }
+
+    function UpdateGridOrder() {
+        const GridContainer = document.getElementById("GifEditGrid")
         if (!GridContainer) return
 
-        const BeforeState = [...this.State.FilteredGifs]
+        const PreviousState = [...AppData.GifItemList]
 
-        const Items = Array.from(GridContainer.children)
-        this.State.FilteredGifs = Items.map((Item, NewIndex) => {
+        const GridItems = Array.from(GridContainer.children)
+        AppData.GifItemList = GridItems.map(function (Item, NewIndex) {
             const OriginalIndex = parseInt(Item.dataset.index)
-            const OriginalGif = this.State.FilteredGifs[OriginalIndex]
+            const OriginalGif = AppData.GifItemList[OriginalIndex]
 
             return {
                 url: OriginalGif.url,
@@ -703,28 +748,28 @@ class GifCurator {
                     src: OriginalGif.metadata.src,
                     width: OriginalGif.metadata.width,
                     height: OriginalGif.metadata.height,
-                    e: Items.length - NewIndex
+                    e: GridItems.length - NewIndex
                 }
             }
         })
 
-        this.State.ActionHistory.push({
-            Action: "reorder",
-            BeforeState: BeforeState
+        AppData.PreviousActions.push({
+            ActionType: "reorder_grid",
+            PreviousState: PreviousState
         })
 
-        this.RenderGifGrid()
+        RenderGifEditingGrid()
     }
 
-    GenerateUniqueIdFromData(Data) {
+    function CreateUniqueIdentifier(Data) {
         try {
             let DataString
             if (typeof Data === "object" && Data !== null) {
                 DataString = JSON.stringify(Data)
             } else if (typeof Data === "string") {
                 try {
-                    const Parsed = JSON.parse(Data)
-                    DataString = JSON.stringify(Parsed)
+                    const ParsedContent = JSON.parse(Data)
+                    DataString = JSON.stringify(ParsedContent)
                 } catch (Error) {
                     DataString = Data
                 }
@@ -732,142 +777,152 @@ class GifCurator {
                 DataString = String(Data)
             }
 
-            const HashBuffer = new Uint8Array(32)
+            const RandomBytes = new Uint8Array(32)
             if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-                crypto.getRandomValues(HashBuffer)
+                crypto.getRandomValues(RandomBytes)
             } else {
-                for (let i = 0; i < 32; i++) HashBuffer[i] = Math.floor(Math.random() * 256)
+                for (let i = 0; i < 32; i++) RandomBytes[i] = Math.floor(Math.random() * 256)
             }
 
-            const HashBase64 = btoa(String.fromCharCode(...HashBuffer))
+            const Base64Hash = btoa(String.fromCharCode(...RandomBytes))
                 .replace(/\+/g, "-")
                 .replace(/\//g, "_")
                 .replace(/=+$/, "")
                 .substring(0, 30)
-            return HashBase64
+            return Base64Hash
         } catch (Error) {
-            const FallbackId = typeof Data === "string" ? Data.slice(0, 30) : "fallback"
-            return FallbackId.replace(/[+/=]/g, "_")
+            const FallbackIdentifier = typeof Data === "string" ? Data.slice(0, 30) : "fallback"
+            return FallbackIdentifier.replace(/[+/=]/g, "_")
         }
     }
 
-    ShowJsonView() {
-        const ExportData = this.GetExportData()
-        const FormattedJson = this.SyntaxHighlight(JSON.stringify(ExportData, null, 2))
-        this.Elements.ExportPreview.innerHTML = FormattedJson
+    function ShowJsonPreview() {
+        const ExportData = GenerateExportData()
+        const FormattedJson = ApplyJsonSyntaxHighlighting(JSON.stringify(ExportData, null, 2))
+        Interface.ResultDisplay.innerHTML = FormattedJson
     }
 
-    ShowBase64View() {
+    function ShowBase64Preview() {
         try {
-            const ExportData = this.GetExportData()
-            const BinaryData = window.Processor.JsonToBase64(ExportData)
-            const Base64String = typeof BinaryData === "string" && BinaryData.includes(",")
-                ? this.ConvertByteStringToBase64(BinaryData)
-                : BinaryData
-            this.Elements.ExportPreview.textContent = Base64String
+            const ExportData = GenerateExportData()
+            const EncodedData = window.Processor.JsonToBase64(ExportData)
+            const Base64Result = typeof EncodedData === "string" && EncodedData.includes(",")
+                ? ConvertBytesToBase64(EncodedData)
+                : EncodedData
+            Interface.ResultDisplay.textContent = Base64Result
         } catch (Error) {
-            this.Elements.ExportPreview.textContent = `Error: ${Error.message}`
+            Interface.ResultDisplay.textContent = `Error: ${Error.message}`
         }
     }
 
-    CopyJson() {
-        const ExportData = this.GetExportData()
+    function CopyJsonToClipboard() {
+        const ExportData = GenerateExportData()
         navigator.clipboard.writeText(JSON.stringify(ExportData, null, 2))
-            .then(() => this.ShowStatusMessage("JSON copied to clipboard!", "info"))
-            .catch(() => this.ShowStatusMessage("Failed to copy JSON", "error"))
-    }
-
-    CopyBase64() {
-        try {
-            const ExportData = this.GetExportData()
-            const BinaryData = window.Processor.JsonToBase64(ExportData)
-            const Base64String = typeof BinaryData === "string" && BinaryData.includes(",")
-                ? this.ConvertByteStringToBase64(BinaryData)
-                : BinaryData
-            navigator.clipboard.writeText(Base64String)
-                .then(() => this.ShowStatusMessage("Base64 copied to clipboard!", "info"))
-                .catch(() => this.ShowStatusMessage("Failed to copy Base64", "error"))
-        } catch (Error) {
-            this.ShowStatusMessage("Failed to generate Base64", "error")
-        }
-    }
-
-    GetExportData() {
-        const ExportGifs = [...this.State.FilteredGifs].sort((A, B) => (A.metadata?.e || 0) - (B.metadata?.e || 0))
-
-        return {
-            metadata: { versionQ: 1, timesFavoritedQ: ExportGifs.length },
-            gifs: { favorites: ExportGifs, xQ: 0 },
-        }
-    }
-
-    ExportJson() {
-        const ExportData = this.GetExportData()
-        const Unique = this.GenerateUniqueIdFromData(ExportData)
-        const Data = new Blob([JSON.stringify(ExportData, null, 2)], { type: "application/json" })
-        const Url = URL.createObjectURL(Data)
-        const A = document.createElement("a")
-        A.href = Url
-        A.download = "gifs_export_" + Unique + ".json"
-        A.click()
-        URL.revokeObjectURL(Url)
-    }
-
-    ExportBase64() {
-        try {
-            const ExportData = this.GetExportData()
-            const BinaryData = window.Processor.JsonToBase64(ExportData)
-            const Base64String = typeof BinaryData === "string" && BinaryData.includes(",")
-                ? this.ConvertByteStringToBase64(BinaryData)
-                : BinaryData
-
-            const Unique = this.GenerateUniqueIdFromData(Base64String)
-            const Data = new Blob([Base64String], { type: "application/octet-stream" })
-            const Url = URL.createObjectURL(Data)
-            const A = document.createElement("a")
-            A.href = Url
-            A.download = "gifs_export_" + Unique + ".bin"
-            A.click()
-            URL.revokeObjectURL(Url)
-        } catch (Error) {
-            this.ShowStatusMessage("Export failed: " + Error.message, "error")
-        }
-    }
-
-    ConvertByteStringToBase64(ByteString) {
-        const ByteArray = ByteString.replace(/\s/g, "").split(",").map(Number)
-        const UintArray = new Uint8Array(ByteArray)
-        let BinaryString = ""
-        UintArray.forEach(Byte => BinaryString += String.fromCharCode(Byte))
-        return btoa(BinaryString)
-    }
-
-    SyntaxHighlight(Json) {
-        Json = Json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        return Json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-            function (Match) {
-                let Class = "text-gray-4"
-                if (/^"/.test(Match)) {
-                    if (/:$/.test(Match)) {
-                        Class = "text-purple-400"
-                    } else {
-                        Class = "text-green-400"
-                    }
-                } else if (/true|false/.test(Match)) {
-                    Class = "text-blue-400"
-                } else if (/null/.test(Match)) {
-                    Class = "text-red-400"
-                } else if (!isNaN(parseFloat(Match))) {
-                    Class = "text-yellow-400"
-                }
-                return '<span class="' + Class + '">' + Match + '</span>'
+            .then(function () {
+                DisplayNotification("JSON copied to clipboard", "success")
+            })
+            .catch(function () {
+                DisplayNotification("Failed to copy JSON", "error")
             })
     }
 
-    ShowStatusMessage(Message, Type = "info", Section = null) {
-        console.log(`[${Type}] ${Message}`)
+    function CopyBase64ToClipboard() {
+        try {
+            const ExportData = GenerateExportData()
+            const EncodedData = window.Processor.JsonToBase64(ExportData)
+            const Base64Result = typeof EncodedData === "string" && EncodedData.includes(",")
+                ? ConvertBytesToBase64(EncodedData)
+                : EncodedData
+            navigator.clipboard.writeText(Base64Result)
+                .then(function () {
+                    DisplayNotification("Base64 copied to clipboard", "success")
+                })
+                .catch(function () {
+                    DisplayNotification("Failed to copy Base64", "error")
+                })
+        } catch (Error) {
+            DisplayNotification("Failed to generate Base64", "error")
+        }
+    }
 
-        const BackgroundColors = {
+    function GenerateExportData() {
+        const OrderedGifs = [...AppData.GifItemList].sort(function (A, B) {
+            return (A.metadata?.e || 0) - (B.metadata?.e || 0)
+        })
+
+        return {
+            metadata: { versionQ: 1, timesFavoritedQ: OrderedGifs.length },
+            gifs: { favorites: OrderedGifs, xQ: 0 }
+        }
+    }
+
+    function DownloadJsonFile() {
+        const ExportData = GenerateExportData()
+        const UniqueId = CreateUniqueIdentifier(ExportData)
+        const FileContent = new Blob([JSON.stringify(ExportData, null, 2)], { type: "application/json" })
+        const FileUrl = URL.createObjectURL(FileContent)
+        const DownloadLink = document.createElement("a")
+        DownloadLink.href = FileUrl
+        DownloadLink.download = "gif_collection_" + UniqueId + ".json"
+        DownloadLink.click()
+        URL.revokeObjectURL(FileUrl)
+    }
+
+    function DownloadBase64File() {
+        try {
+            const ExportData = GenerateExportData()
+            const EncodedData = window.Processor.JsonToBase64(ExportData)
+            const Base64Result = typeof EncodedData === "string" && EncodedData.includes(",")
+                ? ConvertBytesToBase64(EncodedData)
+                : EncodedData
+
+            const UniqueId = CreateUniqueIdentifier(Base64Result)
+            const FileContent = new Blob([Base64Result], { type: "application/octet-stream" })
+            const FileUrl = URL.createObjectURL(FileContent)
+            const DownloadLink = document.createElement("a")
+            DownloadLink.href = FileUrl
+            DownloadLink.download = "gif_collection_" + UniqueId + ".bin"
+            DownloadLink.click()
+            URL.revokeObjectURL(FileUrl)
+        } catch (Error) {
+            DisplayNotification("Export failed: " + Error.message, "error")
+        }
+    }
+
+    function ConvertBytesToBase64(ByteString) {
+        const ByteArray = ByteString.replace(/\s/g, "").split(",").map(Number)
+        const ByteBuffer = new Uint8Array(ByteArray)
+        let BinaryString = ""
+        ByteBuffer.forEach(function (Byte) {
+            BinaryString += String.fromCharCode(Byte)
+        })
+        return btoa(BinaryString)
+    }
+
+    function ApplyJsonSyntaxHighlighting(JsonText) {
+        JsonText = JsonText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        return JsonText.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+            function (Match) {
+                let StyleClass = "text-gray-4"
+                if (/^"/.test(Match)) {
+                    if (/:$/.test(Match)) {
+                        StyleClass = "text-purple-400"
+                    } else {
+                        StyleClass = "text-green-400"
+                    }
+                } else if (/true|false/.test(Match)) {
+                    StyleClass = "text-blue-400"
+                } else if (/null/.test(Match)) {
+                    StyleClass = "text-red-400"
+                } else if (!isNaN(parseFloat(Match))) {
+                    StyleClass = "text-yellow-400"
+                }
+                return '<span class="' + StyleClass + '">' + Match + '</span>'
+            })
+    }
+
+    function DisplayNotification(Message, Type) {
+        const StatusColors = {
             success: "#4BB543",
             error: "#FF3333",
             info: "#3498db",
@@ -879,17 +934,11 @@ class GifCurator {
             duration: 3000,
             gravity: "bottom",
             position: "left",
-            style: { "box-shadow": "none", "background": BackgroundColors[Type] || BackgroundColors.Info, },
+            style: { "background": StatusColors[Type] || StatusColors.info, "box-shadow": "none" },
             className: "rounded-default",
             stopOnFocus: true
         }).showToast()
     }
-}
 
-const CheckProcessor = setInterval(() => {
-    if (window.Processor) {
-        clearInterval(CheckProcessor)
-        const Curator = new GifCurator()
-        window.Curator = Curator
-    }
-}, 100)
+    StartApplication()
+})
