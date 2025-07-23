@@ -564,144 +564,267 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    function RenderGifEditingGrid() {
-        const GridContainer = document.createElement("div")
-        GridContainer.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 w-full"
-        GridContainer.id = "GifEditGrid"
+function RenderGifEditingGrid() {
+    if (!window.GifBlobCache) {
+        window.GifBlobCache = new Map()
+    }
 
-        Interface.EditingArea.innerHTML = ""
-        Interface.EditingArea.appendChild(GridContainer)
+    const GridContainer = document.createElement("div")
+    GridContainer.className = "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 w-full"
+    GridContainer.id = "GifEditGrid"
 
-        const UpdatedGifList = [...AppData.GifItemList]
-            .sort((A, B) => (B.metadata?.e || 0) - (A.metadata?.e || 0))
-            .map((Gif, Index, Arr) => ({
-                url: Gif.url,
-                metadata: {
-                    format: Gif.metadata.format,
-                    src: Gif.metadata.src,
-                    width: Gif.metadata.width,
-                    height: Gif.metadata.height,
-                    e: Arr.length - Index
-                }
-            }))
+    Interface.EditingArea.innerHTML = ""
+    Interface.EditingArea.appendChild(GridContainer)
 
-        AppData.GifItemList = UpdatedGifList
+    const UpdatedGifList = [...AppData.GifItemList]
+        .sort((A, B) => (B.metadata?.e || 0) - (A.metadata?.e || 0))
+        .map((Gif, Index, Arr) => ({
+            url: Gif.url,
+            metadata: {
+                format: Gif.metadata.format,
+                src: Gif.metadata.src,
+                width: Gif.metadata.width,
+                height: Gif.metadata.height,
+                e: Arr.length - Index
+            }
+        }))
 
-        const OptimizedUrls = new Map()
-        UpdatedGifList.forEach((Gif, Index) => {
-            const OriginalUrl = Gif.metadata?.src || Gif.url
-            const OptimizedUrl = new URL(OriginalUrl)
-            OptimizedUrl.searchParams.set("width", Math.floor(Gif.metadata.width / 2))
-            OptimizedUrl.searchParams.set("height", Math.floor(Gif.metadata.height / 2))
-            OptimizedUrls.set(Index, {
-                optimized: OptimizedUrl.toString(),
-                original: OriginalUrl
-            })
+    AppData.GifItemList = UpdatedGifList
+
+    const OptimizedUrls = new Map()
+    
+    UpdatedGifList.forEach((Gif, Index) => {
+        const OriginalUrl = Gif.metadata?.src || Gif.url
+        const OptimizedUrl = new URL(OriginalUrl)
+        OptimizedUrl.searchParams.set("width", Math.floor(Gif.metadata.width / 2))
+        OptimizedUrl.searchParams.set("height", Math.floor(Gif.metadata.height / 2))
+        OptimizedUrls.set(Index, {
+            optimized: OptimizedUrl.toString(),
+            original: OriginalUrl
         })
+    })
 
-        const FastLoad = (Index, TargetImg) => {
-            if (!TargetImg || TargetImg.src) return
+    const InstantLoad = (Index, TargetImg, LoadingSpinner) => {
+        if (!TargetImg || TargetImg.dataset.loading === "true") return
 
-            const Urls = OptimizedUrls.get(Index)
-            if (!Urls) return
+        const Urls = OptimizedUrls.get(Index)
+        if (!Urls) return
 
-            TargetImg.decoding = "sync"
-            TargetImg.loading = "eager"
-            if (TargetImg.fetchPriority) TargetImg.fetchPriority = "high"
+        if (window.GifBlobCache.has(Urls.optimized)) {
+            TargetImg.src = window.GifBlobCache.get(Urls.optimized)
+            LoadingSpinner.style.display = "none"
+            TargetImg.style.opacity = "1"
+            return
+        }
 
-            TargetImg.src = Urls.optimized
-            TargetImg.onerror = () => {
-                TargetImg.src = Urls.original
-                TargetImg.onerror = () => {
-                    TargetImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23999' fill-opacity='0.4' d='M12 2v20M2 12h20'/%3E%3C/svg%3E"
-                }
+        if (window.GifBlobCache.has(Urls.original)) {
+            TargetImg.src = window.GifBlobCache.get(Urls.original)
+            LoadingSpinner.style.display = "none"
+            TargetImg.style.opacity = "1"
+            return
+        }
+
+        TargetImg.dataset.loading = "true"
+
+        const LoadAndCache = async (Url) => {
+            try {
+                const Response = await fetch(Url, {
+                    mode: "cors",
+                    cache: "force-cache",
+                    priority: "high"
+                })
+                
+                if (!Response.ok) throw new Error("Fetch failed")
+                
+                const Blob = await Response.blob()
+                const BlobUrl = URL.createObjectURL(Blob)
+                window.GifBlobCache.set(Url, BlobUrl)
+                return BlobUrl
+            } catch (Error) {
+                throw Error
             }
         }
 
-        const Observer = new IntersectionObserver(Entries => {
-            const Batch = []
-            Entries.forEach(Entry => {
-                if (Entry.isIntersecting) {
-                    const Img = Entry.target.querySelector("img")
-                    const Index = parseInt(Entry.target.dataset.index)
-                    Batch.push({ Img, Index })
-                    Observer.unobserve(Entry.target)
+        LoadAndCache(Urls.optimized)
+            .then(BlobUrl => {
+                if (TargetImg.dataset.loading === "true") {
+                    TargetImg.src = BlobUrl
+                    LoadingSpinner.style.display = "none"
+                    TargetImg.style.opacity = "1"
+                    TargetImg.dataset.loading = "false"
                 }
             })
+            .catch(() => {
+                LoadAndCache(Urls.original)
+                    .then(BlobUrl => {
+                        if (TargetImg.dataset.loading === "true") {
+                            TargetImg.src = BlobUrl
+                            LoadingSpinner.style.display = "none"
+                            TargetImg.style.opacity = "1"
+                            TargetImg.dataset.loading = "false"
+                        }
+                    })
+                    .catch(() => {
+                        if (TargetImg.dataset.loading === "true") {
+                            TargetImg.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23999' fill-opacity='0.4' d='M12 2v20M2 12h20'/%3E%3C/svg%3E"
+                            LoadingSpinner.style.display = "none"
+                            TargetImg.style.opacity = "1"
+                            TargetImg.dataset.loading = "false"
+                        }
+                    })
+            })
+    }
 
-            Batch.forEach(({ Img, Index }) => FastLoad(Index, Img))
-        }, {
-            rootMargin: "100px",
-            threshold: 0
+    const Observer = new IntersectionObserver(Entries => {
+        Entries.forEach(Entry => {
+            if (Entry.isIntersecting) {
+                const Index = parseInt(Entry.target.dataset.index)
+                const Img = Entry.target.querySelector("img")
+                const Spinner = Entry.target.querySelector(".animate-spin").parentElement
+                InstantLoad(Index, Img, Spinner)
+                Observer.unobserve(Entry.target)
+            }
+        })
+    }, {
+        rootMargin: "0px",
+        threshold: 0.1
+    })
+
+    const DocFrag = document.createDocumentFragment()
+
+    UpdatedGifList.forEach((Gif, Index) => {
+        const GifItem = document.createElement("div")
+        GifItem.className = "relative bg-gray-2 rounded-default w-full overflow-hidden flex flex-col"
+        GifItem.dataset.index = Index
+
+        const ImgContainer = document.createElement("div")
+        ImgContainer.className = "bg-transparent relative w-full h-64 cursor-move flex-shrink-0"
+
+        const LoadingSpinner = document.createElement("div")
+        LoadingSpinner.className = "absolute inset-0 flex items-center justify-center bg-gray-2"
+        LoadingSpinner.innerHTML = `<div class="w-8 h-8 border-4 border-gray-4 border-t-blue-500 rounded-full animate-spin"></div>`
+        
+        const Img = document.createElement("img")
+        Img.className = "absolute inset-0 w-full h-full object-contain opacity-0"
+        Img.draggable = false
+        Img.style.transition = "opacity 0.2s ease"
+        Img.dataset.originalSrc = Gif.metadata?.src || Gif.url
+        
+        Img.addEventListener("contextmenu", E => {
+            E.preventDefault()
+            document.querySelectorAll(".custom-context-menu").forEach(Menu => Menu.remove())
+            
+            const ContextMenu = document.createElement("div")
+            ContextMenu.className = "custom-context-menu fixed bg-gray-3 border border-gray-4 rounded shadow-lg z-50 py-1"
+            ContextMenu.style.left = E.pageX + "px"
+            ContextMenu.style.top = E.pageY + "px"
+            ContextMenu.innerHTML = `<div class="px-3 py-2 hover:bg-gray-4 cursor-pointer text-sm text-white">Copy link address</div>`
+            ContextMenu.firstChild.addEventListener("click", () => {
+                navigator.clipboard.writeText(Img.dataset.originalSrc)
+                ContextMenu.remove()
+            })
+            document.body.appendChild(ContextMenu)
+            
+            const RemoveMenu = () => {
+                if (ContextMenu.parentNode) {
+                    ContextMenu.remove()
+                }
+            }
+            
+            setTimeout(RemoveMenu, 3000)
+            document.addEventListener("click", RemoveMenu, { once: true })
         })
 
-        const DocFrag = document.createDocumentFragment()
+        const ControlsContainer = document.createElement("div")
+        ControlsContainer.className = "flex items-center justify-between w-full p-2 bg-gray-3 pointer-events-auto flex-shrink-0"
 
-        UpdatedGifList.forEach((Gif, Index) => {
-            const GifItem = document.createElement("div")
-            GifItem.className = "relative bg-gray-2 rounded-default h-64 w-full overflow-hidden"
-            GifItem.dataset.index = Index
-
-            const ImgContainer = document.createElement("div")
-            ImgContainer.className = "bg-transparent relative w-full h-full"
-
-            const Img = document.createElement("img")
-            Img.className = "absolute inset-0 w-full h-full object-contain"
-
-            const PosDisplay = document.createElement("div")
-            PosDisplay.className = "absolute top-2 left-2 flex items-center"
-            PosDisplay.innerHTML = `
-            <span class="text-sm font-bold text-white px-2 py-1 rounded-l bg-black bg-opacity-70">Pos</span>
-            <span class="position-value text-sm font-bold text-white px-2 py-1 rounded-r bg-black bg-opacity-70 cursor-pointer">${Gif.metadata?.e || "N/A"}</span>
+        const PosDisplay = document.createElement("div")
+        PosDisplay.className = "flex items-center bg-gray-4 rounded"
+        PosDisplay.innerHTML = `
+            <span class="text-sm font-bold text-white px-2 py-1 rounded-l">Pos</span>
+            <span class="position-value text-sm font-bold text-white px-2 py-1 rounded-r cursor-pointer select-none hover:bg-white/20 transition-colors">${Gif.metadata?.e || "N/A"}</span>
         `
 
-            const DeleteBtn = document.createElement("button")
-            DeleteBtn.className = "remove-btn absolute right-2 top-2 w-7 h-7 rounded bg-black flex items-center justify-center text-white cursor-pointer"
-            DeleteBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`
-            DeleteBtn.addEventListener("click", E => {
-                E.stopPropagation()
-                RemoveGifItem(Index)
-            })
+        const DeleteBtn = document.createElement("button")
+        DeleteBtn.className = "remove-btn w-8 h-8 rounded bg-red-500 hover:bg-red-600 flex items-center justify-center text-white cursor-pointer transition-colors shadow-lg"
+        DeleteBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`
+        
+        DeleteBtn.addEventListener("click", E => {
+            E.stopPropagation()
+            E.preventDefault()
+            RemoveGifItem(Index)
+        })
 
-            PosDisplay.lastChild.addEventListener("click", function () {
-                const Input = document.createElement("input")
-                Input.type = "text"
-                Input.className = "text-sm font-bold text-white bg-black bg-opacity-90 px-2 py-1 rounded w-16 outline-none"
-                Input.value = Gif.metadata?.e || ""
+        DeleteBtn.addEventListener("mousedown", E => E.stopPropagation())
+        DeleteBtn.addEventListener("touchstart", E => E.stopPropagation(), { passive: false })
 
-                const Complete = () => {
-                    const NewPos = parseInt(Input.value)
-                    if (!isNaN(NewPos) && NewPos > 0 && NewPos <= UpdatedGifList.length) {
-                        UpdateGifPosition(Index, NewPos)
-                    }
-                    PosDisplay.replaceChild(this, Input)
+        const PositionSpan = PosDisplay.querySelector(".position-value")
+        PositionSpan.addEventListener("click", function(E) {
+            E.stopPropagation()
+            E.preventDefault()
+            
+            const Input = document.createElement("input")
+            Input.type = "number"
+            Input.className = "text-sm font-bold text-white bg-gray-4 px-2 py-1 rounded w-16 outline-none border-none text-center"
+            Input.value = Gif.metadata?.e || ""
+            Input.min = "1"
+            Input.max = UpdatedGifList.length.toString()
+
+            const Complete = () => {
+                const NewPos = parseInt(Input.value)
+                if (!isNaN(NewPos) && NewPos > 0 && NewPos <= UpdatedGifList.length) {
+                    UpdateGifPosition(Index, NewPos)
+                } else {
+                    Input.value = Gif.metadata?.e || ""
                 }
+                PosDisplay.replaceChild(PositionSpan, Input)
+            }
 
-                Input.addEventListener("blur", Complete)
-                Input.addEventListener("keydown", E => E.key === "Enter" && Complete())
-                PosDisplay.replaceChild(Input, this)
-                Input.focus()
+            Input.addEventListener("blur", Complete)
+            Input.addEventListener("keydown", E => {
+                E.stopPropagation()
+                if (E.key === "Enter") {
+                    Complete()
+                } else if (E.key === "Escape") {
+                    PosDisplay.replaceChild(PositionSpan, Input)
+                }
             })
+            
+            Input.addEventListener("mousedown", E => E.stopPropagation())
+            Input.addEventListener("touchstart", E => E.stopPropagation(), { passive: false })
 
-            ImgContainer.appendChild(Img)
-            GifItem.appendChild(ImgContainer)
-            GifItem.appendChild(PosDisplay)
-            GifItem.appendChild(DeleteBtn)
-
-            Observer.observe(GifItem)
-            DocFrag.appendChild(GifItem)
+            PosDisplay.replaceChild(Input, PositionSpan)
+            Input.focus()
+            Input.select()
         })
 
-        GridContainer.appendChild(DocFrag)
-        AppData.SortingHandler?.destroy()
-        AppData.SortingHandler = new Sortable(GridContainer, {
-            animation: 150,
-            ghostClass: "sortable-ghost",
-            onEnd: () => UpdateGridOrder()
-        })
+        PositionSpan.addEventListener("mousedown", E => E.stopPropagation())
+        PositionSpan.addEventListener("touchstart", E => E.stopPropagation(), { passive: false })
 
-        RefreshUndoButton()
-    }
+        ImgContainer.appendChild(LoadingSpinner)
+        ImgContainer.appendChild(Img)
+        ControlsContainer.appendChild(PosDisplay)
+        ControlsContainer.appendChild(DeleteBtn)
+        GifItem.appendChild(ImgContainer)
+        GifItem.appendChild(ControlsContainer)
+
+        Observer.observe(GifItem)
+        DocFrag.appendChild(GifItem)
+    })
+
+    GridContainer.appendChild(DocFrag)
+    AppData.SortingHandler?.destroy()
+    AppData.SortingHandler = new Sortable(GridContainer, {
+        animation: 150,
+        ghostClass: "sortable-ghost",
+        handle: ".cursor-move",
+        filter: ".pointer-events-auto",
+        preventOnFilter: false,
+        onEnd: () => UpdateGridOrder()
+    })
+
+    RefreshUndoButton()
+}
 
     function UpdateGifPosition(CurrentIndex, NewPosition) {
         const PreviousState = JSON.parse(JSON.stringify(AppData.GifItemList))

@@ -35,17 +35,7 @@
     .loading-spinner {
         animation: spin 1s linear infinite
     }
-
-    @keyframes spin {
-        0% {
-            transform: rotate(0deg)
-        }
-
-        100% {
-            transform: rotate(360deg)
-        }
-    }
-
+    
     .rounded-default {
         border-radius: 10px;
     }
